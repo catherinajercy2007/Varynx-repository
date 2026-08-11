@@ -1,34 +1,78 @@
-ALLOWED_ACTIONS = {
-    "research-agent": [
-        "s3:GetObject"
-    ]
+AGENT_POLICIES = {
+    "research-agent": {
+        "intents": {
+            "summarize_public_documents": {
+                "allowed_actions": ["s3:GetObject"],
+                "allowed_resource_prefixes": ["public/"]
+            }
+        }
+    },
+
+    "data-analysis-agent": {
+        "intents": {
+            "analyze_public_data": {
+                "allowed_actions": ["s3:GetObject"],
+                "allowed_resource_prefixes": ["public/"]
+            }
+        }
+    },
+
+    "security-audit-agent": {
+        "intents": {
+            "audit_public_logs": {
+                "allowed_actions": ["s3:GetObject"],
+                "allowed_resource_prefixes": ["public/audit/"]
+            }
+        }
+    }
 }
 
 
-def check_policy(agent_id: str, action: str, resource: str):
-    if agent_id not in ALLOWED_ACTIONS:
+def check_policy(
+    agent_id: str,
+    action: str,
+    resource: str,
+    intent: str
+):
+    if agent_id not in AGENT_POLICIES:
+        return {
+            "decision": "DENY",
+            "risk": 95,
+            "reason": "Agent is not authorized"
+        }
+
+    agent_policy = AGENT_POLICIES[agent_id]
+
+    if intent not in agent_policy["intents"]:
+        return {
+            "decision": "DENY",
+            "risk": 85,
+            "reason": "Intent is not authorized for this agent"
+        }
+
+    intent_policy = agent_policy["intents"][intent]
+
+    if action not in intent_policy["allowed_actions"]:
         return {
             "decision": "DENY",
             "risk": 90,
-            "reason": "Unknown agent"
+            "reason": "Action is not permitted for this task intent"
         }
 
-    if action not in ALLOWED_ACTIONS[agent_id]:
-        return {
-            "decision": "DENY",
-            "risk": 90,
-            "reason": "Action not allowed for this agent"
-        }
+    resource_allowed = any(
+        resource.startswith(prefix)
+        for prefix in intent_policy["allowed_resource_prefixes"]
+    )
 
-    if not resource.startswith("public/"):
+    if not resource_allowed:
         return {
             "decision": "DENY",
-            "risk": 80,
-            "reason": "Resource is outside the allowed public area"
+            "risk": 85,
+            "reason": "Resource is outside the task scope"
         }
 
     return {
         "decision": "ALLOW",
         "risk": 5,
-        "reason": "Request satisfies security policy"
+        "reason": "Identity, task intent, action and resource satisfy policy"
     }

@@ -114,3 +114,27 @@ def verify_task(
         return False
 
     return True
+def get_task(task_id: str, agent_id: str):
+    """
+    Return task information if the task belongs
+    to the specified agent and is still active.
+    """
+
+    task = TASKS.get(task_id)
+
+    if not task:
+        return None
+
+    if not task["active"]:
+        return None
+
+    if task["agent_id"] != agent_id:
+        return None
+
+    now = datetime.now(timezone.utc)
+
+    if now >= task["expires_at"]:
+        task["active"] = False
+        return None
+
+    return task

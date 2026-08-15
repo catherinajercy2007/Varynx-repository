@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from pathlib import Path
+import json
 
 from app.models import (
     AuthorizationRequest,
@@ -18,32 +20,26 @@ from app.identity import (
     get_task
 )
 
+from app.audit import log_authorization_event
+
 
 app = FastAPI(
-    title="Aegis AI Agent Cloud Firewall",
-    description="Intent-Aware Dynamic Authorization Gateway",
-    version="0.3.0"
+    title="AegisGuard",
+    description="Intent-Aware Dynamic Authorization Gateway for AI Agents",
+    version="0.5.0"
 )
 
 
 # ============================================================
-# HOME
+# HEALTH CHECK
 # ============================================================
 
 @app.get("/")
-def home():
+def root():
     return {
-        "project": "Aegis AI Agent Cloud Firewall",
-        "version": "0.3.0",
+        "project": "AegisGuard",
         "status": "running",
-        "security_features": [
-            "Agent Identity",
-            "API Key Verification",
-            "Task Identity",
-            "Task Expiration",
-            "Intent-Aware Authorization",
-            "Resource Scope Validation"
-        ]
+        "version": "0.5.0"
     }
 
 
@@ -55,24 +51,17 @@ def home():
     "/agents/register",
     response_model=AgentRegistrationResponse
 )
-def register_agent_endpoint(
-    request: AgentRegistrationRequest
-):
-    """
-    Register a new AI agent.
-
-    A unique API key is generated for the agent.
-    """
+def register_new_agent(request: AgentRegistrationRequest):
 
     api_key = register_agent(
-        request.agent_id,
-        request.name
+        agent_id=request.agent_id,
+        name=request.name
     )
 
     if api_key is None:
         return {
             "agent_id": request.agent_id,
-            "api_key": "Agent already exists"
+            "api_key": ""
         }
 
     return {
@@ -86,78 +75,7 @@ def register_agent_endpoint(
 # ============================================================
 
 @app.post("/tasks/create")
-def create_task_endpoint(
-    request: TaskRequest
-):
-    """
-    Create a temporary task for an authenticated agent.
-    """
-
-    # --------------------------------------------------------
-    # Step 1: Verify agent identity
-    # --------------------------------------------------------
-
-    if not verify_agent(
-        request.agent_id,
-        request.api_key
-    ):
-        return {
-            "decision": "DENY",
-            "reason": "Invalid agent identity"
-        }
-
-    # --------------------------------------------------------
-    # Step 2: Create task
-    # --------------------------------------------------------
-
-    task = create_task(
-        request.task_id,
-        request.agent_id,
-        request.intent,
-        request.duration_minutes
-    )
-
-    if task is None:
-        return {
-            "decision": "DENY",
-            "reason": "Task already exists"
-        }
-
-    return {
-        "decision": "ALLOW",
-        "task_id": request.task_id,
-        "agent_id": request.agent_id,
-        "intent": request.intent,
-        "expires_at": task["expires_at"]
-    }
-
-
-# ============================================================
-# AUTHORIZATION
-# ============================================================
-
-@app.post(
-    "/authorize",
-    response_model=AuthorizationResponse
-)
-def authorize(
-    request: AuthorizationRequest
-):
-    """
-    Main Aegis authorization endpoint.
-
-    Authorization flow:
-
-    1. Verify agent identity
-    2. Verify task
-    3. Retrieve task intent
-    4. Apply deterministic security policy
-    5. Return ALLOW or DENY
-    """
-
-    # ========================================================
-    # STEP 1 — VERIFY AGENT IDENTITY
-    # ========================================================
+def create_new_task(request: TaskRequest):
 
     if not verify_agent(
         request.agent_id,
@@ -169,23 +87,83 @@ def authorize(
             "reason": "Invalid agent identity"
         }
 
-    # ========================================================
-    # STEP 2 — VERIFY TASK
-    # ========================================================
+    result = create_task(
+        task_id=request.task_id,
+        agent_id=request.agent_id,
+        intent=request.intent,
+        duration_minutes=request.duration_minutes
+    )
+
+    return result
+
+
+# ============================================================
+# CENTRAL AUTHORIZATION
+# ============================================================
+
+@app.post(
+    "/authorize",
+    response_model=AuthorizationResponse
+)
+def authorize(request: AuthorizationRequest):
+
+    # --------------------------------------------------------
+    # 1. VERIFY AGENT
+    # --------------------------------------------------------
+
+    if not verify_agent(
+        request.agent_id,
+        request.api_key
+    ):
+
+        result = {
+            "decision": "DENY",
+            "risk": 100,
+            "reason": "Invalid agent identity"
+        }
+
+        log_authorization_event(
+            agent_id=request.agent_id,
+            task_id=request.task_id,
+            action=request.action,
+            resource=request.resource,
+            decision=result["decision"],
+            risk=result["risk"],
+            reason=result["reason"]
+        )
+
+        return result
+
+    # --------------------------------------------------------
+    # 2. VERIFY TASK
+    # --------------------------------------------------------
 
     if not verify_task(
         request.task_id,
         request.agent_id
     ):
-        return {
+
+        result = {
             "decision": "DENY",
             "risk": 95,
             "reason": "Invalid or expired task"
         }
 
-    # ========================================================
-    # STEP 3 — RETRIEVE TASK
-    # ========================================================
+        log_authorization_event(
+            agent_id=request.agent_id,
+            task_id=request.task_id,
+            action=request.action,
+            resource=request.resource,
+            decision=result["decision"],
+            risk=result["risk"],
+            reason=result["reason"]
+        )
+
+        return result
+
+    # --------------------------------------------------------
+    # 3. GET TASK
+    # --------------------------------------------------------
 
     task = get_task(
         request.task_id,
@@ -193,74 +171,128 @@ def authorize(
     )
 
     if task is None:
-        return {
+
+        result = {
             "decision": "DENY",
             "risk": 95,
-            "reason": "Task could not be retrieved"
+            "reason": "Task not found"
         }
 
-    # ========================================================
-    # STEP 4 — EXTRACT TASK INTENT
-    # ========================================================
+        log_authorization_event(
+            agent_id=request.agent_id,
+            task_id=request.task_id,
+            action=request.action,
+            resource=request.resource,
+            decision=result["decision"],
+            risk=result["risk"],
+            reason=result["reason"]
+        )
+
+        return result
+
+    # --------------------------------------------------------
+    # 4. GET TRUSTED INTENT
+    # --------------------------------------------------------
 
     intent = task["intent"]
 
-    # ========================================================
-    # STEP 5 — APPLY SECURITY POLICY
-    # ========================================================
+    # --------------------------------------------------------
+    # 5. CHECK POLICY
+    # --------------------------------------------------------
 
     result = check_policy(
-        request.agent_id,
-        request.action,
-        request.resource,
-        intent
+        agent_id=request.agent_id,
+        intent=intent,
+        action=request.action,
+        resource=request.resource
     )
 
-    # ========================================================
-    # STEP 6 — RETURN DECISION
-    # ========================================================
+    # --------------------------------------------------------
+    # 6. AUDIT DECISION
+    # --------------------------------------------------------
+
+    log_authorization_event(
+        agent_id=request.agent_id,
+        task_id=request.task_id,
+        action=request.action,
+        resource=request.resource,
+        decision=result["decision"],
+        risk=result["risk"],
+        reason=result["reason"]
+    )
+
+    # --------------------------------------------------------
+    # 7. RETURN RESULT
+    # --------------------------------------------------------
 
     return result
 
 
 # ============================================================
-# DEBUG ENDPOINT
-# ============================================================
-# This is useful during development.
-#
-# IMPORTANT:
-# Remove this endpoint before deploying the application
-# publicly because it exposes internal agent information.
+# DEBUG - AGENTS
 # ============================================================
 
 @app.get("/debug/agents")
 def debug_agents():
+
     from app.identity import AGENTS
 
     return {
-        "registered_agents": list(AGENTS.keys())
+        "registered_agents": AGENTS
     }
 
 
 # ============================================================
-# DEBUG TASK ENDPOINT
-# ============================================================
-# Development only.
-# Remove before production deployment.
+# DEBUG - TASKS
 # ============================================================
 
 @app.get("/debug/tasks")
 def debug_tasks():
+
     from app.identity import TASKS
 
     return {
-        "registered_tasks": {
-            task_id: {
-                "agent_id": task["agent_id"],
-                "intent": task["intent"],
-                "active": task["active"],
-                "expires_at": task["expires_at"]
-            }
-            for task_id, task in TASKS.items()
+        "registered_tasks": TASKS
+    }
+
+
+# ============================================================
+# AUDIT LOGS
+# ============================================================
+
+@app.get("/audit/logs")
+def get_audit_logs():
+
+    audit_file = Path("audit_logs.jsonl")
+
+    if not audit_file.exists():
+        return {
+            "events": []
         }
+
+    events = []
+
+    with audit_file.open(
+        "r",
+        encoding="utf-8"
+    ) as file:
+
+        for line in file:
+
+            line = line.strip()
+
+            if not line:
+                continue
+
+            try:
+                event = json.loads(line)
+
+                if isinstance(event, dict):
+                    events.append(event)
+
+            except json.JSONDecodeError:
+                continue
+
+    return {
+        "events": events
     }

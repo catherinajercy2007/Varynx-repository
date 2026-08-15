@@ -8,24 +8,24 @@ from app.models import (
     TaskRequest
 )
 
-from app.policy import check_policy
-
 from app.identity import (
     register_agent,
     verify_agent,
-    create_task,
-    verify_task,
-    get_task
+    create_task
 )
 
-from app.audit import log_authorization_event
-from app.database import initialize_database, get_audit_events
+from app.authorization import AuthorizationService
+
+from app.database import (
+    initialize_database,
+    get_audit_events
+)
 
 
 app = FastAPI(
     title="AegisGuard",
-    description="Intent-Aware Dynamic Authorization Gateway for AI Agents",
-    version="0.6.0"
+    description="Intent-Aware Dynamic Authorization Gateway for Autonomous AI Agents",
+    version="0.8.0"
 )
 
 
@@ -42,10 +42,11 @@ initialize_database()
 
 @app.get("/")
 def root():
+
     return {
         "project": "AegisGuard",
         "status": "running",
-        "version": "0.6.0"
+        "version": "0.8.0"
     }
 
 
@@ -57,7 +58,9 @@ def root():
     "/agents/register",
     response_model=AgentRegistrationResponse
 )
-def register_new_agent(request: AgentRegistrationRequest):
+def register_new_agent(
+    request: AgentRegistrationRequest
+):
 
     api_key = register_agent(
         agent_id=request.agent_id,
@@ -65,6 +68,7 @@ def register_new_agent(request: AgentRegistrationRequest):
     )
 
     if api_key is None:
+
         return {
             "agent_id": request.agent_id,
             "api_key": ""
@@ -81,26 +85,27 @@ def register_new_agent(request: AgentRegistrationRequest):
 # ============================================================
 
 @app.post("/tasks/create")
-def create_new_task(request: TaskRequest):
+def create_new_task(
+    request: TaskRequest
+):
 
     if not verify_agent(
         request.agent_id,
         request.api_key
     ):
+
         return {
             "decision": "DENY",
             "risk": 100,
             "reason": "Invalid agent identity"
         }
 
-    result = create_task(
+    return create_task(
         task_id=request.task_id,
         agent_id=request.agent_id,
         intent=request.intent,
         duration_minutes=request.duration_minutes
     )
-
-    return result
 
 
 # ============================================================
@@ -111,127 +116,17 @@ def create_new_task(request: TaskRequest):
     "/authorize",
     response_model=AuthorizationResponse
 )
-def authorize(request: AuthorizationRequest):
+def authorize(
+    request: AuthorizationRequest
+):
 
-    # --------------------------------------------------------
-    # 1. VERIFY AGENT
-    # --------------------------------------------------------
-
-    if not verify_agent(
-        request.agent_id,
-        request.api_key
-    ):
-
-        result = {
-            "decision": "DENY",
-            "risk": 100,
-            "reason": "Invalid agent identity"
-        }
-
-        log_authorization_event(
-            agent_id=request.agent_id,
-            task_id=request.task_id,
-            action=request.action,
-            resource=request.resource,
-            decision=result["decision"],
-            risk=result["risk"],
-            reason=result["reason"]
-        )
-
-        return result
-
-    # --------------------------------------------------------
-    # 2. VERIFY TASK
-    # --------------------------------------------------------
-
-    if not verify_task(
-        request.task_id,
-        request.agent_id
-    ):
-
-        result = {
-            "decision": "DENY",
-            "risk": 95,
-            "reason": "Invalid or expired task"
-        }
-
-        log_authorization_event(
-            agent_id=request.agent_id,
-            task_id=request.task_id,
-            action=request.action,
-            resource=request.resource,
-            decision=result["decision"],
-            risk=result["risk"],
-            reason=result["reason"]
-        )
-
-        return result
-
-    # --------------------------------------------------------
-    # 3. GET TASK
-    # --------------------------------------------------------
-
-    task = get_task(
-        request.task_id,
-        request.agent_id
-    )
-
-    if task is None:
-
-        result = {
-            "decision": "DENY",
-            "risk": 95,
-            "reason": "Task not found"
-        }
-
-        log_authorization_event(
-            agent_id=request.agent_id,
-            task_id=request.task_id,
-            action=request.action,
-            resource=request.resource,
-            decision=result["decision"],
-            risk=result["risk"],
-            reason=result["reason"]
-        )
-
-        return result
-
-    # --------------------------------------------------------
-    # 4. GET TRUSTED INTENT
-    # --------------------------------------------------------
-
-    intent = task["intent"]
-
-    # --------------------------------------------------------
-    # 5. CHECK POLICY
-    # --------------------------------------------------------
-
-    result = check_policy(
+    return AuthorizationService.authorize(
         agent_id=request.agent_id,
-        intent=intent,
+        api_key=request.api_key,
+        task_id=request.task_id,
         action=request.action,
         resource=request.resource
     )
-
-    # --------------------------------------------------------
-    # 6. AUDIT DECISION
-    # --------------------------------------------------------
-
-    log_authorization_event(
-        agent_id=request.agent_id,
-        task_id=request.task_id,
-        action=request.action,
-        resource=request.resource,
-        decision=result["decision"],
-        risk=result["risk"],
-        reason=result["reason"]
-    )
-
-    # --------------------------------------------------------
-    # 7. RETURN RESULT
-    # --------------------------------------------------------
-
-    return result
 
 
 # ============================================================

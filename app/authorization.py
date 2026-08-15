@@ -1,131 +1,182 @@
-import sqlite3
-from pathlib import Path
-from datetime import datetime, timezone
+from app.identity import (
+    verify_agent,
+    verify_task,
+    get_task
+)
+
+from app.policy import check_policy
+
+from app.audit import log_authorization_event
+
+from app.risk import calculate_risk
 
 
-DATABASE_FILE = Path("aegisguard.db")
+class AuthorizationService:
+    """
+    Central authorization service for AegisGuard.
 
+    The service performs:
 
-def get_connection():
+    1. Agent verification
+    2. Task verification
+    3. Trusted intent retrieval
+    4. Policy evaluation
+    5. Risk evaluation
+    6. Audit logging
+    """
 
-    connection = sqlite3.connect(
-        DATABASE_FILE
-    )
-
-    connection.row_factory = sqlite3.Row
-
-    return connection
-
-
-def initialize_database():
-
-    connection = get_connection()
-
-    connection.execute(
+    @staticmethod
+    def _deny(
+        agent_id: str,
+        task_id: str,
+        action: str,
+        resource: str,
+        risk: int,
+        reason: str
+    ):
         """
-        CREATE TABLE IF NOT EXISTS audit_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            agent_id TEXT NOT NULL,
-            task_id TEXT NOT NULL,
-            action TEXT NOT NULL,
-            resource TEXT NOT NULL,
-            decision TEXT NOT NULL,
-            risk INTEGER NOT NULL,
-            reason TEXT NOT NULL
+        Create, risk-evaluate and audit a DENY decision.
+        """
+
+        result = {
+            "decision": "DENY",
+            "risk": risk,
+            "reason": reason
+        }
+
+        log_authorization_event(
+            agent_id=agent_id,
+            task_id=task_id,
+            action=action,
+            resource=resource,
+            decision=result["decision"],
+            risk=result["risk"],
+            reason=result["reason"]
         )
+
+        return result
+
+    @staticmethod
+    def authorize(
+        agent_id: str,
+        api_key: str,
+        task_id: str,
+        action: str,
+        resource: str
+    ):
         """
-    )
-
-    connection.commit()
-    connection.close()
-
-
-def save_audit_event(
-    agent_id: str,
-    task_id: str,
-    action: str,
-    resource: str,
-    decision: str,
-    risk: int,
-    reason: str
-):
-
-    timestamp = datetime.now(
-        timezone.utc
-    ).isoformat()
-
-    connection = get_connection()
-
-    cursor = connection.execute(
+        Execute the complete authorization workflow.
         """
-        INSERT INTO audit_events (
-            timestamp,
+
+        # ----------------------------------------------------
+        # 1. VERIFY AGENT
+        # ----------------------------------------------------
+
+        if not verify_agent(
             agent_id,
+            api_key
+        ):
+
+            return AuthorizationService._deny(
+                agent_id=agent_id,
+                task_id=task_id,
+                action=action,
+                resource=resource,
+                risk=100,
+                reason="Invalid agent identity"
+            )
+
+        # ----------------------------------------------------
+        # 2. VERIFY TASK
+        # ----------------------------------------------------
+
+        if not verify_task(
             task_id,
-            action,
-            resource,
-            decision,
-            risk,
-            reason
+            agent_id
+        ):
+
+            return AuthorizationService._deny(
+                agent_id=agent_id,
+                task_id=task_id,
+                action=action,
+                resource=resource,
+                risk=95,
+                reason="Invalid or expired task"
+            )
+
+        # ----------------------------------------------------
+        # 3. GET TASK
+        # ----------------------------------------------------
+
+        task = get_task(
+            task_id,
+            agent_id
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            timestamp,
-            agent_id,
-            task_id,
-            action,
-            resource,
-            decision,
-            risk,
-            reason
+
+        if task is None:
+
+            return AuthorizationService._deny(
+                agent_id=agent_id,
+                task_id=task_id,
+                action=action,
+                resource=resource,
+                risk=95,
+                reason="Task not found"
+            )
+
+        # ----------------------------------------------------
+        # 4. GET TRUSTED TASK INTENT
+        # ----------------------------------------------------
+
+        intent = task["intent"]
+
+        # ----------------------------------------------------
+        # 5. POLICY EVALUATION
+        # ----------------------------------------------------
+
+        policy_result = check_policy(
+            agent_id=agent_id,
+            intent=intent,
+            action=action,
+            resource=resource
         )
-    )
 
-    connection.commit()
+        decision = policy_result["decision"]
+        reason = policy_result["reason"]
 
-    event_id = cursor.lastrowid
+        # ----------------------------------------------------
+        # 6. RISK EVALUATION
+        # ----------------------------------------------------
 
-    connection.close()
+        risk = calculate_risk(
+            decision=decision,
+            action=action,
+            resource=resource,
+            reason=reason
+        )
 
-    return {
-        "id": event_id,
-        "timestamp": timestamp,
-        "agent_id": agent_id,
-        "task_id": task_id,
-        "action": action,
-        "resource": resource,
-        "decision": decision,
-        "risk": risk,
-        "reason": reason
-    }
+        result = {
+            "decision": decision,
+            "risk": risk,
+            "reason": reason
+        }
 
+        # ----------------------------------------------------
+        # 7. AUDIT
+        # ----------------------------------------------------
 
-def get_audit_events():
+        log_authorization_event(
+            agent_id=agent_id,
+            task_id=task_id,
+            action=action,
+            resource=resource,
+            decision=decision,
+            risk=risk,
+            reason=reason
+        )
 
-    connection = get_connection()
+        # ----------------------------------------------------
+        # 8. RETURN
+        # ----------------------------------------------------
 
-    rows = connection.execute(
-        """
-        SELECT
-            id,
-            timestamp,
-            agent_id,
-            task_id,
-            action,
-            resource,
-            decision,
-            risk,
-            reason
-        FROM audit_events
-        ORDER BY id ASC
-        """
-    ).fetchall()
-
-    connection.close()
-
-    return [
-        dict(row)
-        for row in rows
-    ]
+        return result

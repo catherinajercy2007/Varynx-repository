@@ -24,6 +24,33 @@ AGENT_POLICIES = {
                 "allowed_resource_prefixes": ["public/audit/"]
             }
         }
+    },
+
+    "risk-test-agent": {
+        "intents": {
+            "analyze_public_data": {
+                "allowed_actions": ["s3:GetObject"],
+                "allowed_resource_prefixes": ["public/"]
+            }
+        }
+    },
+
+    "risk-test-agent-2": {
+        "intents": {
+            "analyze_public_data": {
+                "allowed_actions": ["s3:GetObject"],
+                "allowed_resource_prefixes": ["public/"]
+            }
+        }
+    },
+
+    "day8-risk-agent": {
+        "intents": {
+            "analyze_public_data": {
+                "allowed_actions": ["s3:GetObject"],
+                "allowed_resource_prefixes": ["public/"]
+            }
+        }
     }
 }
 
@@ -34,6 +61,10 @@ def check_policy(
     resource: str,
     intent: str
 ):
+    # --------------------------------------------------------
+    # 1. AGENT AUTHORIZATION
+    # --------------------------------------------------------
+
     if agent_id not in AGENT_POLICIES:
         return {
             "decision": "DENY",
@@ -42,6 +73,10 @@ def check_policy(
         }
 
     agent_policy = AGENT_POLICIES[agent_id]
+
+    # --------------------------------------------------------
+    # 2. INTENT AUTHORIZATION
+    # --------------------------------------------------------
 
     if intent not in agent_policy["intents"]:
         return {
@@ -52,12 +87,20 @@ def check_policy(
 
     intent_policy = agent_policy["intents"][intent]
 
+    # --------------------------------------------------------
+    # 3. ACTION AUTHORIZATION
+    # --------------------------------------------------------
+
     if action not in intent_policy["allowed_actions"]:
         return {
             "decision": "DENY",
             "risk": 90,
             "reason": "Action is not permitted for this task intent"
         }
+
+    # --------------------------------------------------------
+    # 4. RESOURCE AUTHORIZATION
+    # --------------------------------------------------------
 
     resource_allowed = any(
         resource.startswith(prefix)
@@ -70,6 +113,10 @@ def check_policy(
             "risk": 85,
             "reason": "Resource is outside the task scope"
         }
+
+    # --------------------------------------------------------
+    # 5. AUTHORIZED REQUEST
+    # --------------------------------------------------------
 
     return {
         "decision": "ALLOW",

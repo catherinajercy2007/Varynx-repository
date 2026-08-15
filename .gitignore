@@ -1,5 +1,9 @@
-﻿venv/
+﻿@"
+venv/
+venvvenv/
 __pycache__/
 *.pyc
 .env
 audit_logs.jsonl
+aegisguard.db
+"@ | Set-Content ".gitignore" -Encoding UTF8

@@ -1,6 +1,4 @@
 from fastapi import FastAPI
-from pathlib import Path
-import json
 
 from app.models import (
     AuthorizationRequest,
@@ -21,13 +19,21 @@ from app.identity import (
 )
 
 from app.audit import log_authorization_event
+from app.database import initialize_database, get_audit_events
 
 
 app = FastAPI(
     title="AegisGuard",
     description="Intent-Aware Dynamic Authorization Gateway for AI Agents",
-    version="0.5.0"
+    version="0.6.0"
 )
+
+
+# ============================================================
+# DATABASE INITIALIZATION
+# ============================================================
+
+initialize_database()
 
 
 # ============================================================
@@ -39,7 +45,7 @@ def root():
     return {
         "project": "AegisGuard",
         "status": "running",
-        "version": "0.5.0"
+        "version": "0.6.0"
     }
 
 
@@ -229,7 +235,7 @@ def authorize(request: AuthorizationRequest):
 
 
 # ============================================================
-# DEBUG - AGENTS
+# DEBUG — AGENTS
 # ============================================================
 
 @app.get("/debug/agents")
@@ -243,7 +249,7 @@ def debug_agents():
 
 
 # ============================================================
-# DEBUG - TASKS
+# DEBUG — TASKS
 # ============================================================
 
 @app.get("/debug/tasks")
@@ -263,36 +269,6 @@ def debug_tasks():
 @app.get("/audit/logs")
 def get_audit_logs():
 
-    audit_file = Path("audit_logs.jsonl")
-
-    if not audit_file.exists():
-        return {
-            "events": []
-        }
-
-    events = []
-
-    with audit_file.open(
-        "r",
-        encoding="utf-8"
-    ) as file:
-
-        for line in file:
-
-            line = line.strip()
-
-            if not line:
-                continue
-
-            try:
-                event = json.loads(line)
-
-                if isinstance(event, dict):
-                    events.append(event)
-
-            except json.JSONDecodeError:
-                continue
-
     return {
-        "events": events
+        "events": get_audit_events()
     }

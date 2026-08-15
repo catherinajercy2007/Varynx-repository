@@ -1,9 +1,4 @@
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-
-
-AUDIT_FILE = Path("audit_logs.jsonl")
+from app.database import save_audit_event
 
 
 def log_authorization_event(
@@ -16,26 +11,16 @@ def log_authorization_event(
     reason: str
 ):
     """
-    Store one authorization decision as a JSON Lines event.
+    Store an authorization decision in the
+    persistent SQLite audit database.
     """
 
-    event = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "agent_id": agent_id,
-        "task_id": task_id,
-        "action": action,
-        "resource": resource,
-        "decision": decision,
-        "risk": risk,
-        "reason": reason
-    }
-
-    with AUDIT_FILE.open(
-        "a",
-        encoding="utf-8"
-    ) as file:
-        file.write(
-            json.dumps(event) + "\n"
-        )
-
-    return event
+    return save_audit_event(
+        agent_id=agent_id,
+        task_id=task_id,
+        action=action,
+        resource=resource,
+        decision=decision,
+        risk=risk,
+        reason=reason
+    )

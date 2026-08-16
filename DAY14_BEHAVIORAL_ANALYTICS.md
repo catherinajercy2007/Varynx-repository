@@ -2,21 +2,13 @@
 
 ## Objective
 
-Day 14 adds behavioral analysis to AegisGuard.
+Day 14 adds behavioral security analytics to AegisGuard.
 
-The system analyzes historical authorization events to identify suspicious agent behavior.
+The system analyzes historical authorization audit events to identify suspicious agent behavior.
 
-## Behavioral Flow
+## Data Source
+
+Behavioral analytics uses the persistent SQLite database:
 
 ```text
-Audit Events
-     ↓
-Agent Activity
-     ↓
-Denial Analysis
-     ↓
-Risk Analysis
-     ↓
-Behavior Classification
-     ↓
-NORMAL / ELEVATED / SUSPICIOUS
+aegisguard.db

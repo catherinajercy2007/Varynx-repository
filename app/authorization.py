@@ -1,28 +1,22 @@
 from app.identity import (
     verify_agent,
     verify_task,
-    get_task
+    get_task,
 )
 
 from app.policy import check_policy
 
 from app.audit import log_authorization_event
 
-from app.risk import calculate_risk
+from app.risk import evaluate_risk
 
 
 class AuthorizationService:
     """
-    Central authorization service for AegisGuard.
+    Central authorization service.
 
-    The service performs:
-
-    1. Agent verification
-    2. Task verification
-    3. Trusted intent retrieval
-    4. Policy evaluation
-    5. Risk evaluation
-    6. Audit logging
+    Day 9 adds risk-adaptive authorization to the
+    existing identity, task, policy and audit flow.
     """
 
     @staticmethod
@@ -31,17 +25,14 @@ class AuthorizationService:
         task_id: str,
         action: str,
         resource: str,
-        risk: int,
-        reason: str
+        reason: str,
+        risk: int = 100,
     ):
-        """
-        Create, risk-evaluate and audit a DENY decision.
-        """
 
         result = {
             "decision": "DENY",
             "risk": risk,
-            "reason": reason
+            "reason": reason,
         }
 
         log_authorization_event(
@@ -49,9 +40,9 @@ class AuthorizationService:
             task_id=task_id,
             action=action,
             resource=resource,
-            decision=result["decision"],
-            risk=result["risk"],
-            reason=result["reason"]
+            decision="DENY",
+            risk=risk,
+            reason=reason,
         )
 
         return result
@@ -62,121 +53,137 @@ class AuthorizationService:
         api_key: str,
         task_id: str,
         action: str,
-        resource: str
+        resource: str,
     ):
-        """
-        Execute the complete authorization workflow.
-        """
 
-        # ----------------------------------------------------
+        # ====================================================
         # 1. VERIFY AGENT
-        # ----------------------------------------------------
+        # ====================================================
 
         if not verify_agent(
             agent_id,
-            api_key
+            api_key,
         ):
-
             return AuthorizationService._deny(
                 agent_id=agent_id,
                 task_id=task_id,
                 action=action,
                 resource=resource,
                 risk=100,
-                reason="Invalid agent identity"
+                reason="Invalid agent identity",
             )
 
-        # ----------------------------------------------------
+        # ====================================================
         # 2. VERIFY TASK
-        # ----------------------------------------------------
+        # ====================================================
 
         if not verify_task(
             task_id,
-            agent_id
+            agent_id,
         ):
-
             return AuthorizationService._deny(
                 agent_id=agent_id,
                 task_id=task_id,
                 action=action,
                 resource=resource,
-                risk=95,
-                reason="Invalid or expired task"
+                risk=100,
+                reason="Invalid or expired task",
             )
 
-        # ----------------------------------------------------
+        # ====================================================
         # 3. GET TASK
-        # ----------------------------------------------------
+        # ====================================================
 
         task = get_task(
             task_id,
-            agent_id
+            agent_id,
         )
 
         if task is None:
-
             return AuthorizationService._deny(
                 agent_id=agent_id,
                 task_id=task_id,
                 action=action,
                 resource=resource,
-                risk=95,
-                reason="Task not found"
+                risk=100,
+                reason="Task not found",
             )
 
-        # ----------------------------------------------------
-        # 4. GET TRUSTED TASK INTENT
-        # ----------------------------------------------------
+        # ====================================================
+        # 4. TRUSTED TASK INTENT
+        # ====================================================
 
         intent = task["intent"]
 
-        # ----------------------------------------------------
+        # ====================================================
         # 5. POLICY EVALUATION
-        # ----------------------------------------------------
+        # ====================================================
 
         policy_result = check_policy(
             agent_id=agent_id,
-            intent=intent,
-            action=action,
-            resource=resource
-        )
-
-        decision = policy_result["decision"]
-        reason = policy_result["reason"]
-
-        # ----------------------------------------------------
-        # 6. RISK EVALUATION
-        # ----------------------------------------------------
-
-        risk = calculate_risk(
-            decision=decision,
             action=action,
             resource=resource,
-            reason=reason
+            intent=intent,
         )
 
+        policy_decision = policy_result["decision"]
+        policy_reason = policy_result["reason"]
+
+        # ====================================================
+        # 6. RISK EVALUATION
+        # ====================================================
+
+        risk_result = evaluate_risk(
+            decision=policy_decision,
+            action=action,
+            resource=resource,
+            reason=policy_reason,
+        )
+
+        final_decision = risk_result["decision"]
+        risk = risk_result["risk"]
+
+        # ====================================================
+        # 7. BUILD RESPONSE
+        # ====================================================
+
+        if risk_result["risk_factors"]:
+
+            factor_text = ", ".join(
+                risk_result["risk_factors"]
+            )
+
+            final_reason = (
+                f"{policy_reason}. "
+                f"Risk level: {risk_result['risk_level']}. "
+                f"Factors: {factor_text}"
+            )
+
+        else:
+
+            final_reason = (
+                f"{policy_reason}. "
+                f"Risk level: {risk_result['risk_level']}."
+            )
+
         result = {
-            "decision": decision,
+            "decision": final_decision,
             "risk": risk,
-            "reason": reason
+            "reason": final_reason,
         }
 
-        # ----------------------------------------------------
-        # 7. AUDIT
-        # ----------------------------------------------------
+        # ====================================================
+        # 8. AUDIT
+        # ====================================================
 
         log_authorization_event(
             agent_id=agent_id,
             task_id=task_id,
             action=action,
             resource=resource,
-            decision=decision,
+            decision=final_decision,
             risk=risk,
-            reason=reason
+            reason=final_reason,
         )
-
-        # ----------------------------------------------------
-        # 8. RETURN
-        # ----------------------------------------------------
 
         return result

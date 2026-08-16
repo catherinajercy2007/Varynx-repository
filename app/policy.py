@@ -51,6 +51,15 @@ AGENT_POLICIES = {
                 "allowed_resource_prefixes": ["public/"]
             }
         }
+    },
+
+    "day9-risk-agent": {
+        "intents": {
+            "analyze_public_data": {
+                "allowed_actions": ["s3:GetObject"],
+                "allowed_resource_prefixes": ["public/"]
+            }
+        }
     }
 }
 
@@ -62,7 +71,7 @@ def check_policy(
     intent: str
 ):
     # --------------------------------------------------------
-    # 1. AGENT AUTHORIZATION
+    # 1. VERIFY AGENT
     # --------------------------------------------------------
 
     if agent_id not in AGENT_POLICIES:
@@ -75,7 +84,7 @@ def check_policy(
     agent_policy = AGENT_POLICIES[agent_id]
 
     # --------------------------------------------------------
-    # 2. INTENT AUTHORIZATION
+    # 2. VERIFY INTENT
     # --------------------------------------------------------
 
     if intent not in agent_policy["intents"]:
@@ -88,7 +97,7 @@ def check_policy(
     intent_policy = agent_policy["intents"][intent]
 
     # --------------------------------------------------------
-    # 3. ACTION AUTHORIZATION
+    # 3. VERIFY ACTION
     # --------------------------------------------------------
 
     if action not in intent_policy["allowed_actions"]:
@@ -99,7 +108,7 @@ def check_policy(
         }
 
     # --------------------------------------------------------
-    # 4. RESOURCE AUTHORIZATION
+    # 4. VERIFY RESOURCE
     # --------------------------------------------------------
 
     resource_allowed = any(
@@ -115,7 +124,7 @@ def check_policy(
         }
 
     # --------------------------------------------------------
-    # 5. AUTHORIZED REQUEST
+    # 5. ALLOW
     # --------------------------------------------------------
 
     return {

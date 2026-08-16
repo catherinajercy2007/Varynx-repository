@@ -1,14 +1,15 @@
+from typing import Any
+
+
 class RiskEngine:
     """
-    Deterministic prototype risk engine for AegisGuard.
+    Day 9 risk-adaptive authorization engine.
 
-    Risk score:
-        0   = very low risk
-        100 = critical risk
-
-    The risk engine does not replace policy.
-    Policy determines whether the request is authorized.
-    The risk engine evaluates the security risk of the request.
+    Produces:
+        - risk score: 0-100
+        - risk level
+        - risk factors
+        - recommended decision
     """
 
     SENSITIVE_RESOURCE_KEYWORDS = (
@@ -16,9 +17,9 @@ class RiskEngine:
         "confidential/",
         "secret/",
         "secrets/",
-        "admin/",
         "credentials/",
-        "customer/"
+        "customer/",
+        "admin/",
     )
 
     HIGH_RISK_ACTION_KEYWORDS = (
@@ -26,105 +27,168 @@ class RiskEngine:
         "destroy",
         "terminate",
         "drop",
-        "remove"
+        "remove",
     )
 
     PRIVILEGED_ACTION_KEYWORDS = (
         "iam:",
         "admin",
         "root",
-        "privilege"
+        "privilege",
     )
 
     @staticmethod
-    def calculate_risk(
+    def calculate(
         decision: str,
         action: str,
         resource: str,
-        reason: str = ""
-    ) -> int:
-        """
-        Calculate a deterministic risk score from 0 to 100.
-        """
+        reason: str = "",
+    ) -> dict[str, Any]:
 
         decision = decision.upper()
+
         action_lower = action.lower()
         resource_lower = resource.lower()
         reason_lower = reason.lower()
 
-        # ----------------------------------------------------
-        # BASE RISK
-        # ----------------------------------------------------
+        score = 5
+        factors = []
 
-        if decision == "ALLOW":
-            risk = 5
-        else:
-            risk = 50
-
-        # ----------------------------------------------------
-        # DENIED REQUEST
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # POLICY DECISION
+        # --------------------------------------------------
 
         if decision == "DENY":
-            risk += 20
+            score += 40
+            factors.append("Policy denied the request")
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # SENSITIVE RESOURCE
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         if any(
             keyword in resource_lower
             for keyword in RiskEngine.SENSITIVE_RESOURCE_KEYWORDS
         ):
-            risk += 25
+            score += 25
+            factors.append("Sensitive resource")
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # HIGH-RISK ACTION
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         if any(
             keyword in action_lower
             for keyword in RiskEngine.HIGH_RISK_ACTION_KEYWORDS
         ):
-            risk += 35
+            score += 35
+            factors.append("High-risk action")
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # PRIVILEGED ACTION
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         if any(
             keyword in action_lower
             for keyword in RiskEngine.PRIVILEGED_ACTION_KEYWORDS
         ):
-            risk += 30
+            score += 30
+            factors.append("Privileged action")
 
-        # ----------------------------------------------------
-        # POLICY DENIAL REASON
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # UNAUTHORIZED REQUEST
+        # --------------------------------------------------
 
         if "unauthorized" in reason_lower:
-            risk += 10
+            score += 20
+            factors.append("Unauthorized request")
 
-        # ----------------------------------------------------
-        # LIMIT SCORE
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # INVALID IDENTITY
+        # --------------------------------------------------
 
-        return min(max(risk, 0), 100)
+        if "invalid agent" in reason_lower:
+            score += 50
+            factors.append("Invalid agent identity")
+
+        # --------------------------------------------------
+        # INVALID TASK
+        # --------------------------------------------------
+
+        if "invalid or expired task" in reason_lower:
+            score += 40
+            factors.append("Invalid or expired task")
+
+        # --------------------------------------------------
+        # CAP SCORE
+        # --------------------------------------------------
+
+        score = min(max(score, 0), 100)
+
+        # --------------------------------------------------
+        # RISK LEVEL
+        # --------------------------------------------------
+
+        if score <= 20:
+            level = "LOW"
+
+        elif score <= 50:
+            level = "MEDIUM"
+
+        elif score <= 80:
+            level = "HIGH"
+
+        else:
+            level = "CRITICAL"
+
+        # --------------------------------------------------
+        # RISK-ADAPTIVE DECISION
+        # --------------------------------------------------
+
+        if decision == "DENY":
+            final_decision = "DENY"
+
+        elif score >= 80:
+            final_decision = "DENY"
+
+        else:
+            final_decision = "ALLOW"
+
+        return {
+            "risk": score,
+            "risk_level": level,
+            "risk_factors": factors,
+            "decision": final_decision,
+        }
 
 
 def calculate_risk(
     decision: str,
     action: str,
     resource: str,
-    reason: str = ""
+    reason: str = "",
 ) -> int:
-    """
-    Convenience function for calculating request risk.
-    """
 
-    return RiskEngine.calculate_risk(
+    result = RiskEngine.calculate(
         decision=decision,
         action=action,
         resource=resource,
-        reason=reason
+        reason=reason,
+    )
+
+    return result["risk"]
+
+
+def evaluate_risk(
+    decision: str,
+    action: str,
+    resource: str,
+    reason: str = "",
+) -> dict[str, Any]:
+
+    return RiskEngine.calculate(
+        decision=decision,
+        action=action,
+        resource=resource,
+        reason=reason,
     )

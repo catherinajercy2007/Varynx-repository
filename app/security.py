@@ -100,7 +100,7 @@ class SecurityValidator:
         if any(
             ord(character) < 32
             for character in resource
-            if character not in ("\t",)
+            if character != "\t"
         ):
             return False, "Invalid control character detected"
 
@@ -140,11 +140,50 @@ class SecurityValidator:
         ]
 
         for valid, message in checks:
-
             if not valid:
                 return False, message
 
         return True, "Security validation passed"
+
+
+# ============================================================
+# MODULE-LEVEL FUNCTIONS
+# Required by tests/test_security.py
+# ============================================================
+
+def validate_agent_id(
+    agent_id: str
+) -> Tuple[bool, str]:
+
+    return SecurityValidator.validate_agent_id(agent_id)
+
+
+def validate_task_id(
+    task_id: str
+) -> Tuple[bool, str]:
+
+    return SecurityValidator.validate_task_id(task_id)
+
+
+def validate_action(
+    action: str
+) -> Tuple[bool, str]:
+
+    return SecurityValidator.validate_action(action)
+
+
+def validate_resource(
+    resource: str
+) -> Tuple[bool, str]:
+
+    return SecurityValidator.validate_resource(resource)
+
+
+def validate_api_key(
+    api_key: str
+) -> Tuple[bool, str]:
+
+    return SecurityValidator.validate_api_key(api_key)
 
 
 def validate_authorization_request(

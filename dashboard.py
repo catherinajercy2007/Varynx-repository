@@ -914,7 +914,173 @@ if show_investigation:
                 "No security events matched the "
                 "selected investigation criteria."
             )
+# ============================================================
+# BEHAVIORAL FEATURE ANALYTICS
+# ============================================================
 
+st.divider()
+
+st.header(
+    "🧠 Behavioral Feature Analytics"
+)
+
+st.caption(
+    "Agent-level behavioral features derived from "
+    "historical security telemetry."
+)
+
+try:
+
+    behavioral_features = (
+        get_behavioral_features()
+    )
+
+except Exception as error:
+
+    st.error(
+        f"Unable to calculate behavioral features: {error}"
+    )
+
+    behavioral_features = []
+
+
+if behavioral_features:
+
+    behavior_df = pd.DataFrame(
+        behavioral_features
+    )
+
+    # --------------------------------------------------------
+    # BEHAVIORAL OVERVIEW
+    # --------------------------------------------------------
+
+    behavior_col_1, behavior_col_2, behavior_col_3 = (
+        st.columns(3)
+    )
+
+    with behavior_col_1:
+
+        st.metric(
+            "Agents Profiled",
+            len(behavior_df),
+        )
+
+    with behavior_col_2:
+
+        average_agent_risk = round(
+            behavior_df["average_risk"].mean(),
+            2,
+        )
+
+        st.metric(
+            "Mean Agent Risk",
+            average_agent_risk,
+        )
+
+    with behavior_col_3:
+
+        high_behavior_agents = int(
+            (
+                behavior_df["denial_rate"]
+                >= 0.5
+            ).sum()
+        )
+
+        st.metric(
+            "High-Denial Agents",
+            high_behavior_agents,
+        )
+
+    # --------------------------------------------------------
+    # FEATURE TABLE
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Behavioral Feature Matrix"
+    )
+
+    st.dataframe(
+        behavior_df,
+        width="stretch",
+        hide_index=True,
+    )
+
+    # --------------------------------------------------------
+    # DENIAL RATE
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Agent Denial Rate"
+    )
+
+    denial_chart = (
+        behavior_df[
+            [
+                "agent_id",
+                "denial_rate",
+            ]
+        ]
+        .set_index("agent_id")
+    )
+
+    st.bar_chart(
+        denial_chart,
+        width="stretch",
+    )
+
+    # --------------------------------------------------------
+    # AVERAGE RISK
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Agent Average Risk"
+    )
+
+    risk_chart = (
+        behavior_df[
+            [
+                "agent_id",
+                "average_risk",
+            ]
+        ]
+        .set_index("agent_id")
+    )
+
+    st.bar_chart(
+        risk_chart,
+        width="stretch",
+    )
+
+    # --------------------------------------------------------
+    # BEHAVIORAL DIVERSITY
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Behavioral Diversity"
+    )
+
+    diversity_df = (
+        behavior_df[
+            [
+                "agent_id",
+                "action_diversity",
+                "resource_diversity",
+                "task_diversity",
+            ]
+        ]
+        .set_index("agent_id")
+    )
+
+    st.bar_chart(
+        diversity_df,
+        width="stretch",
+    )
+
+else:
+
+    st.info(
+        "No behavioral feature data available."
+    )
 
 # ============================================================
 # AGENT INTELLIGENCE

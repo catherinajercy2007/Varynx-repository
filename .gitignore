@@ -7,3 +7,5 @@ __pycache__/
 audit_logs.jsonl
 aegisguard.db
 "@ | Set-Content ".gitignore" -Encoding UTF8
+# Streamlit agent skills (environment-specific symlinks)
+.agents/skills/developing-with-streamlit

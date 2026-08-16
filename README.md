@@ -1,378 +1,260 @@
-🛡️ AegisGuard
+# 🛡️ AegisGuard
 
-AI Agent Firewall, Behavioral Security & Autonomous Threat Detection Platform
+## Behavior-Aware Security Control Plane for Autonomous AI Agents
 
-AegisGuard is a research-oriented cybersecurity platform designed to protect AI agents, autonomous systems, and agentic workflows from unauthorized actions, privilege abuse, behavioral anomalies, and potentially malicious activity.
+**AegisGuard** is a research-oriented cybersecurity framework designed to protect autonomous and semi-autonomous AI agents from **unauthorized actions, privilege misuse, policy violations, abnormal behavioral patterns, and potentially malicious activity**.
 
-The project combines policy-based authorization, risk-aware access control, security audit logging, behavioral analytics, anomaly detection, machine learning, threat correlation, and security monitoring into a layered AI-agent security architecture.
+Rather than treating authorization as a one-time `ALLOW` or `DENY` decision, AegisGuard explores a layered security model in which an agent's **identity, task, requested action, resource, risk context, historical behavior, and anomaly signals** are continuously evaluated.
 
-AegisGuard is being developed as a 62–90 day research-level cybersecurity project, progressing from deterministic authorization controls toward behavioral intelligence, anomaly detection, explainable security analytics, adversarial testing, and research evaluation.
-
----
-
-📌 Research Overview
-
-AI agents are increasingly capable of interacting with:
-
-- Files
-- Databases
-- APIs
-- Cloud resources
-- Operating-system services
-- Internal applications
-- External tools
-- Other autonomous agents
-
-This creates a new security problem.
-
-An agent may be legitimately authenticated but still perform an unsafe action because of:
-
-- Prompt injection
-- Excessive permissions
-- Compromised agent behavior
-- Privilege escalation
-- Tool misuse
-- Credential abuse
-- Unauthorized resource access
-- Repeated failed authorization attempts
-- Behavioral deviation
-- Compromised dependencies
-- Malicious or manipulated instructions
-
-Traditional authorization mechanisms generally evaluate:
-
-«"Is this request allowed?"»
-
-AegisGuard investigates a broader question:
-
-«"Is this request authorized, sufficiently low-risk, consistent with the agent's historical behavior, and safe within the current security context?"»
+The long-term objective is to develop a practical security control plane capable of operating between autonomous agents and the resources they are permitted to access.
 
 ---
 
-🎯 Research Objective
+## 🚨 The Problem
 
-The primary objective of AegisGuard is to design and evaluate a defense-in-depth security architecture for AI agents that combines deterministic security controls with behavioral and machine-learning-based security signals.
+AI agents are moving beyond simple question answering.
 
-The research investigates whether combining:
+Modern agents can:
 
-Policy Enforcement
-        +
-Authorization
-        +
-Risk Scoring
-        +
-Audit Logging
-        +
-Behavioral Analytics
-        +
-Anomaly Detection
-        +
-Machine Learning
-        +
-Threat Correlation
+* Execute system commands
+* Read and modify files
+* Query databases
+* Call APIs
+* Access cloud resources
+* Manipulate application state
+* Use external tools
+* Perform multi-step workflows
+* Make decisions with limited human intervention
 
-can provide stronger visibility and detection capabilities than relying exclusively on traditional authorization.
+This creates a security problem that traditional access control does not fully address.
 
----
+A conventional authorization system may answer:
 
-🔬 Research Questions
+> **"Is this agent allowed to perform this action?"**
 
-The project investigates the following research questions:
+But autonomous systems introduce additional questions:
 
-RQ1 — Authorization
+> **"Is this action appropriate for the current task?"**
 
-Can fine-grained authorization policies effectively restrict AI-agent actions and resources?
+> **"Is the requested resource consistent with the agent's normal behavior?"**
 
-RQ2 — Risk
+> **"Is the agent gradually attempting higher-risk operations?"**
 
-Can contextual risk scoring improve prioritization of potentially dangerous agent requests?
+> **"Has this agent repeatedly violated authorization boundaries?"**
 
-RQ3 — Behavior
+> **"Does the current behavior significantly differ from its historical profile?"**
 
-Can historical agent behavior identify suspicious activity that individual request authorization cannot detect?
+> **"Should the security system increase scrutiny even if the individual request is technically permitted?"**
 
-RQ4 — Anomaly Detection
+These questions create a gap between **static authorization** and **behavior-aware security**.
 
-Can unsupervised machine-learning techniques detect previously unseen behavioral deviations?
-
-RQ5 — Explainability
-
-Can anomaly and risk predictions be presented in an interpretable form suitable for security investigation?
-
-RQ6 — Defense in Depth
-
-Does combining deterministic authorization with behavioral and ML-based signals improve security monitoring compared with a single-layer authorization system?
-
-RQ7 — Adversarial Robustness
-
-How resilient is the architecture against common AI-agent abuse and adversarial scenarios?
+AegisGuard is designed to investigate and address that gap.
 
 ---
 
-🧠 Core Research Hypothesis
+# 🎯 Research Problem Statement
 
-«A layered security architecture combining deterministic authorization, contextual risk analysis, behavioral profiling, and anomaly detection can provide stronger detection and investigation capabilities for AI-agent abuse than authorization alone.»
+### Core Problem
 
-The ML component is not intended to replace deterministic authorization.
+> **How can autonomous AI agents be continuously monitored and controlled using a security architecture that combines deterministic authorization, contextual risk assessment, behavioral profiling, audit evidence, and anomaly detection without relying exclusively on machine-learning decisions?**
+
+The project investigates whether a layered security model can provide stronger protection for autonomous agents than isolated request-level authorization.
+
+---
+
+# 💡 Proposed Solution
+
+AegisGuard introduces a **multi-layer agent security architecture**:
+
+```text
+                    AUTONOMOUS AI AGENT
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Request Interceptor │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Identity & Context  │
+                 │ Validation          │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Policy-Based        │
+                 │ Authorization       │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+                 ┌─────────────────────┐
+                 │ Contextual Risk     │
+                 │ Assessment          │
+                 └──────────┬──────────┘
+                            │
+                   ┌────────┴────────┐
+                   ▼                 ▼
+                ALLOW               DENY
+                   │
+                   ▼
+        ┌──────────────────────────────┐
+        │ Security Audit & Telemetry   │
+        └──────────────┬───────────────┘
+                       │
+                       ▼
+        ┌──────────────────────────────┐
+        │ Behavioral Profiling         │
+        └──────────────┬───────────────┘
+                       │
+              ┌────────┴────────┐
+              ▼                 ▼
+       Rule-Based Analysis   ML Analysis
+              │                 │
+              └────────┬────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ Anomaly / Threat Signal      │
+        └──────────────┬───────────────┘
+                       │
+                       ▼
+        ┌──────────────────────────────┐
+        │ Security Operations Dashboard│
+        └──────────────────────────────┘
+```
+
+---
+
+# 🔐 Core Security Philosophy
+
+AegisGuard follows a **defense-in-depth** model.
+
+No single component is expected to determine whether an agent is malicious.
 
 Instead:
 
-Deterministic Security
-        +
-Behavioral Intelligence
-        +
-ML Anomaly Signal
-        ↓
+```text
+Identity
+   +
+Task Context
+   +
+Authorization Policy
+   +
+Risk Assessment
+   +
+Audit Evidence
+   +
+Behavioral Profile
+   +
+Anomaly Detection
+   ↓
 Security Decision Support
+```
+
+This distinction is fundamental to the project.
+
+### ML is not the authorization authority.
+
+A machine-learning model may identify unusual behavior, but an anomaly score alone does not prove malicious intent.
+
+AegisGuard therefore separates:
+
+**Security enforcement**
+
+from
+
+**Security intelligence**
+
+This makes the architecture safer and more explainable.
 
 ---
 
-🏗️ High-Level Architecture
+# 🧩 Major Components
 
-                         ┌──────────────────────┐
-                         │      AI AGENT        │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │ Request Interceptor │
-                         └──────────┬───────────┘
-                                    │
-                                    ▼
-                    ┌──────────────────────────────┐
-                    │      Context Extraction      │
-                    │                              │
-                    │ Agent / Task / Action /     │
-                    │ Resource / Session / Time   │
-                    └──────────────┬───────────────┘
-                                   │
-                                   ▼
-                    ┌──────────────────────────────┐
-                    │   Policy Authorization       │
-                    │                              │
-                    │ Allow / Deny / Constraints  │
-                    └──────────────┬───────────────┘
-                                   │
-                                   ▼
-                    ┌──────────────────────────────┐
-                    │       Risk Engine            │
-                    │                              │
-                    │ Contextual Risk Assessment   │
-                    └──────────────┬───────────────┘
-                                   │
-                         ┌─────────┴─────────┐
-                         ▼                   ▼
-                      ALLOW                 DENY
-                         │                   │
-                         └─────────┬─────────┘
-                                   │
-                                   ▼
-                    ┌──────────────────────────────┐
-                    │       Audit Logging          │
-                    └──────────────┬───────────────┘
-                                   │
-                                   ▼
-                    ┌──────────────────────────────┐
-                    │   Behavioral Feature Engine  │
-                    │                              │
-                    │ Frequency / Risk / Denials  │
-                    │ Resources / Actions / Tasks │
-                    └──────────────┬───────────────┘
-                                   │
-                         ┌─────────┴─────────┐
-                         ▼                   ▼
-                Rule-Based Analysis     ML Analysis
-                         │                   │
-                         │           ┌───────┴────────┐
-                         │           │ Anomaly Engine │
-                         │           └───────┬────────┘
-                         │                   │
-                         └─────────┬─────────┘
-                                   ▼
-                    ┌──────────────────────────────┐
-                    │   Security Correlation Layer │
-                    └──────────────┬───────────────┘
-                                   │
-                                   ▼
-                    ┌──────────────────────────────┐
-                    │      Security Dashboard      │
-                    │                              │
-                    │ Detection / Investigation /  │
-                    │ Analytics / Alerts / Reports │
-                    └──────────────────────────────┘
+## 1. Agent Identity & Security Context
+
+Every request is associated with security context such as:
+
+```text
+Agent ID
+Task ID
+Action
+Resource
+Timestamp
+Security Policy
+```
+
+This establishes the context required for evaluating agent behavior.
 
 ---
 
-🔐 Security Architecture
+## 2. Policy-Based Authorization
 
-AegisGuard follows a defense-in-depth model.
+AegisGuard evaluates whether an agent is permitted to perform a requested operation.
 
-Layer 1 — Identity
+Example:
 
-Identifies the requesting agent and associated security context.
+```text
+Agent:
+data-analysis-agent
 
-Layer 2 — Task Authorization
+Task:
+daily-report
 
-Determines whether the agent is authorized to perform the requested task.
+Action:
+read
 
-Layer 3 — Action Authorization
+Resource:
+sales_database
 
-Controls operations such as:
+Decision:
+ALLOW
+```
 
-READ
-WRITE
-EXECUTE
-DELETE
-CREATE
-MODIFY
+An unauthorized request may produce:
 
-Layer 4 — Resource Authorization
+```text
+Decision:
+DENY
 
-Controls access to specific resources.
-
-Examples:
-
-files
-databases
-APIs
-cloud resources
-system services
-
-Layer 5 — Risk Evaluation
-
-Calculates contextual risk based on request characteristics.
-
-Layer 6 — Audit Logging
-
-Records security-relevant events for investigation and research.
-
-Layer 7 — Behavioral Analysis
-
-Builds historical profiles of agent activity.
-
-Layer 8 — Anomaly Detection
-
-Identifies deviations from established behavioral patterns.
-
-Layer 9 — Security Correlation
-
-Combines multiple signals to identify higher-confidence security events.
-
-Layer 10 — Monitoring & Investigation
-
-Provides security analysts with visibility into agent behavior and security decisions.
+Reason:
+Resource not permitted for current task
+```
 
 ---
 
-🧩 Major Components
+# ⚠️ 3. Contextual Risk Assessment
 
-AegisGuard
-│
-├── Authorization Engine
-├── Policy Engine
-├── Risk Engine
-├── Audit Logger
-├── Security Analytics
-├── Behavioral Analytics
-├── Feature Engineering
-├── Anomaly Detection
-├── ML Security Engine
-├── Threat Correlation
-├── Alert Engine
-├── Investigation Engine
-├── Streamlit Security Dashboard
-├── Evaluation Framework
-└── Research Experiment Framework
+Authorization alone is insufficient for autonomous systems.
 
----
+AegisGuard therefore assigns a security risk signal to requests.
 
-📂 Proposed Project Structure
+Example:
 
-aegis-agent-firewall/
-│
-├── app/
-│   ├── __init__.py
-│   │
-│   ├── authorization.py
-│   ├── policy.py
-│   ├── risk.py
-│   ├── database.py
-│   ├── audit.py
-│   │
-│   ├── analytics.py
-│   ├── behavior.py
-│   ├── features.py
-│   ├── anomaly.py
-│   ├── ml_engine.py
-│   ├── correlation.py
-│   ├── alerts.py
-│   └── investigation.py
-│
-├── tests/
-│   ├── test_authorization.py
-│   ├── test_policy.py
-│   ├── test_risk.py
-│   ├── test_audit.py
-│   ├── test_analytics.py
-│   ├── test_behavior.py
-│   ├── test_features.py
-│   ├── test_anomaly.py
-│   ├── test_ml_engine.py
-│   └── test_security_attacks.py
-│
-├── experiments/
-│   ├── datasets/
-│   ├── notebooks/
-│   ├── results/
-│   ├── models/
-│   └── reports/
-│
-├── docs/
-│   ├── architecture/
-│   ├── threat-model/
-│   ├── experiments/
-│   ├── evaluation/
-│   └── research/
-│
-├── dashboard.py
-├── requirements.txt
-├── README.md
-├── .gitignore
-└── LICENSE
+```text
+Risk Score: 82
+Decision: DENY
+Reason: High-risk unauthorized resource access
+```
+
+Risk information can be used for:
+
+* Prioritization
+* Monitoring
+* Investigation
+* Behavioral analysis
+* Security alerting
+
+Risk scores are treated as **signals**, not absolute truth.
 
 ---
 
-🛠️ Technology Stack
+# 📝 4. Security Audit & Telemetry
 
-Technology| Purpose
-Python| Core security implementation
-SQLite| Audit/event storage
-Pandas| Security analytics
-Streamlit| Security monitoring dashboard
-Pytest| Security testing
-Scikit-learn| Machine learning and anomaly detection
-NumPy| Numerical processing
-Git| Version control
-GitHub| Research/project repository
-Jupyter| Research experiments
-Matplotlib| Research visualization
+Every important security decision should generate evidence.
 
-Future integrations may include:
+Representative audit fields include:
 
-- Splunk
-- SIEM systems
-- Cloud security services
-- Container security
-- REST APIs
-- Threat intelligence platforms
-
----
-
-📊 Security Data Model
-
-AegisGuard maintains security events containing information such as:
-
-event_id
+```text
 timestamp
 agent_id
 task_id
@@ -381,54 +263,106 @@ resource
 decision
 risk
 reason
-session_id
-behavior_status
-anomaly_score
+```
 
-The event model may evolve during the research phase.
+The audit layer enables:
 
----
-
-🧮 Risk Scoring
-
-Risk scoring provides contextual security information.
-
-A request may consider:
-
-Action Risk
-Resource Sensitivity
-Agent Trust
-Historical Behavior
-Authorization Result
-Request Frequency
-Previous Denials
-Security Context
-
-A conceptual model:
-
-Risk =
-    Action Risk
-  + Resource Risk
-  + Behavioral Risk
-  + Historical Risk
-  + Contextual Risk
-
-Risk scores should be interpreted as security signals rather than definitive proof of malicious behavior.
+* Incident investigation
+* Behavioral profiling
+* Historical analysis
+* Security reporting
+* Anomaly detection
+* Reproducible experiments
 
 ---
 
-🧠 Behavioral Profiling
+# 🧠 5. Behavioral Profiling
 
-AegisGuard builds behavioral profiles for agents.
+AegisGuard moves beyond individual requests by constructing behavioral profiles for agents.
 
-Example feature vector:
+Example:
 
+```text
+Agent: research-agent
+
+Requests:           184
+Allowed:            169
+Denied:              15
+Denial Rate:        8.15%
+Average Risk:       24.7
+Maximum Risk:       91
+High-Risk Events:    6
+Unique Resources:   12
+Unique Actions:      5
+```
+
+The objective is to understand:
+
+> **What does normal behavior look like for this agent?**
+
+Once a baseline exists, deviations can be investigated.
+
+---
+
+# 🔎 6. Suspicious Behavior Detection
+
+AegisGuard can identify behavioral indicators such as:
+
+* Repeated authorization failures
+* High-risk request bursts
+* Unexpected resource access
+* Unusual action patterns
+* Rapid resource expansion
+* Abnormal denial rates
+* Significant deviation from historical behavior
+
+Agents can initially be categorized using deterministic behavioral rules:
+
+```text
+NORMAL
+ELEVATED
+SUSPICIOUS
+```
+
+These rule-based signals provide interpretable security evidence before introducing more complex models.
+
+---
+
+# 🤖 7. ML-Assisted Anomaly Detection
+
+The research phase extends behavioral analysis toward machine learning.
+
+The intended pipeline is:
+
+```text
+Audit Events
+     │
+     ▼
+Feature Engineering
+     │
+     ▼
+Behavioral Feature Matrix
+     │
+     ▼
+Anomaly Detection
+     │
+     ▼
+Anomaly Score
+     │
+     ▼
+Investigation / Alert
+```
+
+Potential behavioral features include:
+
+```text
 request_count
 allow_count
 deny_count
 deny_rate
 average_risk
 maximum_risk
+risk_variance
 high_risk_count
 unique_resources
 unique_actions
@@ -436,748 +370,704 @@ unique_tasks
 request_frequency
 resource_diversity
 action_diversity
-risk_variance
+```
 
-Example:
+The initial research direction can investigate unsupervised approaches such as:
 
-Agent: research-agent
+* Isolation Forest
+* Local Outlier Factor
+* One-Class SVM
+* Clustering-based behavioral profiling
+* Statistical anomaly detection
 
-Requests:          250
-Allowed:           221
-Denied:             29
-Denial Rate:       11.6%
-Average Risk:       24.8
-Maximum Risk:       91
-High-Risk Events:   14
-Resources:           9
-Actions:              5
+The project will evaluate models based on **security usefulness, interpretability, stability, false-positive behavior, and computational cost**, rather than assuming that a more complex model is automatically better.
 
 ---
 
-🤖 Anomaly Detection
+# 🖥️ 8. Security Operations Dashboard
 
-The project investigates unsupervised anomaly detection for AI-agent behavior.
+AegisGuard provides a Streamlit-based security monitoring interface.
 
-Potential algorithms include:
+The dashboard is intended to evolve into a lightweight SOC-style interface.
 
-- Isolation Forest
-- Local Outlier Factor
-- One-Class SVM
-- Statistical anomaly detection
-- Clustering-based detection
+### Security Overview
 
-The first research implementation may use Isolation Forest because malicious or abnormal behavior may not have reliable labeled training data.
+```text
+┌────────────┬────────────┬────────────┬────────────┐
+│   Events   │   Allowed  │   Denied   │ High Risk  │
+├────────────┼────────────┼────────────┼────────────┤
+│ Suspicious │ Avg Risk   │ Max Risk   │ Anomalies  │
+└────────────┴────────────┴────────────┴────────────┘
+```
 
-Conceptual pipeline:
+### Monitoring capabilities
 
-Audit Events
-      ↓
-Feature Extraction
-      ↓
-Feature Normalization
-      ↓
-Behavioral Matrix
-      ↓
-Anomaly Model
-      ↓
-Anomaly Score
-      ↓
-Security Classification
+* Authorization activity
+* Risk distribution
+* Agent activity
+* Suspicious agents
+* Repeated denials
+* High-risk events
+* Behavioral anomalies
+* Security event investigation
+* Historical activity analysis
 
 ---
 
-🔍 Explainable Security
+# 🏗️ Research Architecture
 
-AegisGuard aims to avoid producing unexplained:
+The long-term architecture is structured around five layers:
 
-ANOMALY = TRUE
+```text
+┌──────────────────────────────────────────┐
+│          Agent Interaction Layer        │
+├──────────────────────────────────────────┤
+│          Security Enforcement Layer     │
+│  Identity | Policy | Authorization      │
+├──────────────────────────────────────────┤
+│          Risk & Monitoring Layer        │
+│  Risk | Audit | Telemetry               │
+├──────────────────────────────────────────┤
+│          Behavioral Intelligence        │
+│  Profiling | Rules | Anomaly Detection  │
+├──────────────────────────────────────────┤
+│          Security Operations Layer      │
+│  Dashboard | Alerts | Investigation     │
+└──────────────────────────────────────────┘
+```
 
-Instead, investigations should expose supporting evidence such as:
-
-Anomaly Score: 0.87
-
-Contributing Indicators:
-- Unusual request frequency
-- New resource access
-- High denial rate
-- Elevated risk
-- Behavioral deviation
-
-The objective is to make ML outputs useful to a security analyst.
-
----
-
-🚨 Threat Model
-
-AegisGuard considers threats including:
-
-Unauthorized Resource Access
-
-Agent attempts to access resources outside its assigned permissions.
-
-Privilege Abuse
-
-An authorized agent attempts operations beyond its intended responsibilities.
-
-Tool Misuse
-
-An agent uses a legitimate tool in an unexpected or dangerous way.
-
-Prompt Injection
-
-Malicious instructions attempt to manipulate agent behavior.
-
-Credential Abuse
-
-Compromised credentials are used to perform unauthorized actions.
-
-Behavioral Compromise
-
-An agent gradually changes behavior after compromise.
-
-Repeated Denial Attacks
-
-An agent repeatedly attempts unauthorized operations.
-
-Resource Enumeration
-
-An agent systematically probes resources to discover accessible targets.
-
-Privilege Escalation
-
-An agent attempts to move from a low-privilege context to a higher-privilege context.
-
-Data Exfiltration
-
-An agent attempts to access or transfer sensitive resources unexpectedly.
+This separation allows individual security mechanisms to be evaluated independently.
 
 ---
 
-🧪 Security Testing Strategy
+# 🔬 Research Questions
 
-Testing is performed at multiple levels.
+The project is designed around research questions such as:
 
-Unit Testing
+### RQ1 — Authorization
 
-Tests individual security functions.
+> Can contextual, task-aware authorization reduce unauthorized agent actions compared with simple permission checks?
 
-Integration Testing
+### RQ2 — Risk
 
-Tests interaction between:
+> Can contextual risk scoring improve prioritization of potentially dangerous agent requests?
 
-Authorization
-Risk
-Audit
-Analytics
-Behavior
-ML
+### RQ3 — Behavioral Security
 
-Abuse Testing
+> Can historical agent behavior provide useful evidence for identifying suspicious activity?
 
-Tests malicious or abnormal requests.
+### RQ4 — Anomaly Detection
 
-Adversarial Testing
+> Can unsupervised machine-learning methods identify meaningful deviations from established agent behavior?
 
-Tests behavior under manipulated or hostile inputs.
+### RQ5 — False Positives
 
-Regression Testing
+> How can behavioral and ML-based detection improve security without generating excessive false positives?
 
-Ensures new features do not break existing security controls.
+### RQ6 — Explainability
 
----
+> Can anomaly detection produce security signals that investigators can understand and validate?
 
-🔴 Attack Scenarios
+### RQ7 — Defense in Depth
 
-The research test suite may evaluate scenarios such as:
-
-Unauthorized Action
-Unauthorized Resource
-Repeated Denial
-Privilege Escalation
-Resource Enumeration
-High-Risk Operation
-Abnormal Request Frequency
-Behavioral Drift
-Credential Misuse
-Suspicious Tool Usage
-Prompt-Injection-Inspired Behavior
+> Does combining deterministic authorization with behavioral intelligence provide stronger security coverage than either approach independently?
 
 ---
 
-📈 Research Evaluation
+# 🧪 Experimental Methodology
 
-AegisGuard will be evaluated using measurable security and performance metrics.
+AegisGuard is intended to be evaluated experimentally rather than only demonstrated through screenshots.
 
-Detection Metrics
+The evaluation pipeline is:
 
+```text
+Normal Agent Behavior
+        │
+        ▼
+Baseline Collection
+        │
+        ▼
+Controlled Security Violations
+        │
+        ▼
+Behavioral Feature Extraction
+        │
+        ▼
+Detection Models
+        │
+        ▼
+Evaluation
+        │
+        ▼
+Security Analysis
+```
+
+---
+
+# 🧬 Threat Scenarios
+
+The research environment can simulate controlled scenarios including:
+
+### Scenario 1 — Unauthorized Resource Access
+
+An agent attempts to access a resource outside its policy.
+
+```text
+Expected:
+DENY
+```
+
+### Scenario 2 — Repeated Authorization Abuse
+
+An agent repeatedly attempts prohibited operations.
+
+```text
+Expected:
+Behavioral escalation
+```
+
+### Scenario 3 — Privilege Expansion
+
+An agent gradually attempts increasingly sensitive resources.
+
+```text
+Expected:
+Risk escalation
+```
+
+### Scenario 4 — Behavioral Drift
+
+An agent changes from its normal activity profile.
+
+```text
+Expected:
+Anomaly signal
+```
+
+### Scenario 5 — High-Risk Burst
+
+An agent suddenly generates multiple high-risk operations.
+
+```text
+Expected:
+Elevated monitoring / investigation
+```
+
+### Scenario 6 — Legitimate High-Activity Agent
+
+An agent performs many legitimate requests.
+
+```text
+Expected:
+High activity ≠ automatically malicious
+```
+
+This scenario is important for measuring false positives.
+
+---
+
+# 📊 Evaluation Metrics
+
+The research phase will evaluate security mechanisms using measurable metrics.
+
+## Detection Metrics
+
+```text
 Precision
 Recall
 F1 Score
 False Positive Rate
 False Negative Rate
-ROC-AUC
-PR-AUC
+Detection Rate
+```
 
-Where appropriate.
+## Operational Metrics
 
-Security Metrics
-
-Unauthorized Requests Detected
-Suspicious Agents Detected
-High-Risk Events Detected
-Behavioral Anomalies Detected
-Attack Detection Rate
-
-Performance Metrics
-
-Authorization Latency
-Risk Evaluation Latency
-Logging Overhead
-Feature Extraction Time
-ML Inference Time
+```text
+Detection Latency
+Processing Time
 Memory Usage
-Throughput
+Requests Per Second
+Model Training Time
+Inference Time
+```
+
+## Security Metrics
+
+```text
+Unauthorized Actions Blocked
+High-Risk Events Detected
+Suspicious Agents Identified
+Behavioral Deviations Detected
+Repeated Abuse Detected
+```
+
+The project should report these metrics using controlled experiments rather than relying only on anecdotal examples.
 
 ---
 
-🧪 Experimental Methodology
+# 📈 Research Evaluation Strategy
 
-Experiments will follow a controlled process:
+AegisGuard can compare progressively stronger security configurations:
 
-1. Define Security Hypothesis
-          ↓
-2. Define Experimental Dataset
-          ↓
-3. Establish Baseline
-          ↓
-4. Execute Attack/Normal Scenarios
-          ↓
-5. Collect Security Events
-          ↓
-6. Extract Behavioral Features
-          ↓
-7. Run Detection Algorithms
-          ↓
-8. Measure Results
-          ↓
-9. Compare Approaches
-          ↓
-10. Analyze Limitations
-          ↓
-11. Document Findings
-
----
-
-📚 62–90 Day Research Roadmap
-
-Phase 1 — Security Foundation
-
-Days 1–15
-
-Completed foundational work:
-
-- Project architecture
-- Authorization engine
-- Policy enforcement
-- Risk evaluation
-- Audit logging
-- Security validation
-- Attack and abuse testing
-- Security analytics
-- Behavioral analytics
-- Streamlit security dashboard
-
----
-
-Phase 2 — Advanced Monitoring
-
-Days 16–30
-
-Days 16–20
-
-- Advanced security dashboard
-- Security investigation interface
-- Behavioral feature engineering
-- Anomaly detection
-- ML-assisted monitoring
-
-Days 21–25
-
-- Alert generation
-- Security event correlation
-- Temporal behavioral analysis
-- Agent trust scoring
-- Risk trend analysis
-
-Days 26–30
-
-- Advanced attack simulations
-- Detection benchmarking
-- False-positive analysis
-- Performance optimization
-- Security monitoring improvements
-
----
-
-Phase 3 — Research & ML
-
-Days 31–45
-
-Focus:
-
-Behavioral Intelligence
+```text
+Experiment A
+Traditional Authorization
         ↓
-Machine Learning
-        ↓
-Explainability
-        ↓
-Evaluation
-
-Planned work:
-
-- Dataset generation
-- Behavioral feature selection
-- Baseline models
-- Isolation Forest
-- One-Class SVM
-- Local Outlier Factor
-- Clustering
-- Model comparison
-- Threshold optimization
-- Explainability
-- Model evaluation
-
----
-
-Phase 4 — Adversarial Security
-
-Days 46–60
-
-Focus on adversarial and offensive evaluation.
-
-Planned scenarios:
-
-- Prompt injection
-- Tool abuse
-- Privilege escalation
-- Resource enumeration
-- Credential misuse
-- Behavioral manipulation
-- Data exfiltration
-- Malicious task execution
-- Agent impersonation
-- Policy bypass attempts
-
-Research objective:
-
-«Determine how well AegisGuard maintains security boundaries when an agent is intentionally manipulated or compromised.»
-
----
-
-Phase 5 — Research Validation
-
-Days 61–75
-
-Focus:
-
 Baseline
-   vs
-AegisGuard
-   vs
-AegisGuard + Behavioral Detection
-   vs
-AegisGuard + ML
 
-Experiments will compare:
+Experiment B
+Authorization + Risk Scoring
+        ↓
+Improved Contextual Detection
 
-- Detection effectiveness
-- False positives
-- False negatives
-- Response latency
-- Computational overhead
-- Explainability
-- Robustness
+Experiment C
+Authorization + Risk + Behavioral Rules
+        ↓
+Behavior-Aware Security
 
-Research results will be documented in:
+Experiment D
+Authorization + Risk + Behavioral Rules + ML
+        ↓
+Full AegisGuard Architecture
+```
 
-experiments/
-docs/evaluation/
-docs/research/
+This makes it possible to investigate whether each additional layer provides measurable security benefits.
 
 ---
 
-Phase 6 — Final Research System
+# 🧪 Testing Strategy
 
-Days 76–90
+The project uses automated testing to validate security behavior.
 
-Final development stage:
+Run:
 
-- Architecture hardening
-- Advanced threat correlation
-- Explainable anomaly detection
-- Security alerting
-- Performance optimization
-- Reproducible experiments
-- Final security evaluation
-- Research documentation
-- Final architecture diagrams
-- Final results
-- Limitations
-- Future work
-- Research report
-- Demonstration environment
+```powershell
+python -m pytest -q
+```
 
-Final target:
+Testing areas include:
 
-AI Agent
-    ↓
-AegisGuard Firewall
-    ↓
-Authorization
-    ↓
-Risk
-    ↓
-Audit
-    ↓
-Behavior
-    ↓
-Anomaly Detection
-    ↓
-Threat Correlation
-    ↓
-Security Monitoring
-    ↓
-Research Evaluation
+* Authorization enforcement
+* Invalid actions
+* Unauthorized resources
+* Policy violations
+* Risk evaluation
+* Abuse scenarios
+* Audit logging
+* Security analytics
+* Behavioral analysis
+* Anomaly detection
+
+Security tests should be expanded alongside every new security capability.
 
 ---
 
-📊 Research Comparison Framework
+# 📁 Project Structure
 
-A major goal is to compare multiple security configurations.
+The architecture is expected to evolve toward:
 
-Configuration| Authorization| Risk| Behavior| ML
-Baseline| ✓| ✗| ✗| ✗
-Risk-Aware| ✓| ✓| ✗| ✗
-Behavioral| ✓| ✓| ✓| ✗
-ML-Assisted| ✓| ✓| ✓| ✓
+```text
+aegis-agent-firewall/
+│
+├── app/
+│   ├── __init__.py
+│   ├── authorization.py
+│   ├── risk.py
+│   ├── analytics.py
+│   ├── behavior.py
+│   ├── features.py
+│   ├── anomaly.py
+│   ├── monitoring.py
+│   └── ...
+│
+├── tests/
+│   ├── test_authorization.py
+│   ├── test_risk.py
+│   ├── test_security.py
+│   ├── test_analytics.py
+│   ├── test_behavior.py
+│   ├── test_features.py
+│   ├── test_anomaly.py
+│   └── ...
+│
+├── dashboard.py
+├── requirements.txt
+├── README.md
+├── .gitignore
+│
+└── runtime/
+    ├── aegisguard.db
+    └── audit logs
+```
 
-This allows the research to measure whether additional layers actually provide measurable security benefits.
-
----
-
-🧪 Reproducibility
-
-Research experiments should be reproducible.
-
-Where applicable, record:
-
-Dataset Version
-Experiment ID
-Model Version
-Feature Set
-Hyperparameters
-Random Seed
-Thresholds
-Environment
-Python Version
-Library Versions
-Results
-
-Experiment results should be stored separately from production/runtime data.
-
----
-
-📊 Dashboard Vision
-
-The final security dashboard is intended to provide:
-
-┌─────────────────────────────────────────────┐
-│       AEGISGUARD SECURITY OPERATIONS        │
-├────────────┬────────────┬───────────────────┤
-│ Requests   │ Denied     │ Anomalies         │
-├────────────┼────────────┼───────────────────┤
-│ Risk       │ Agents     │ Alerts            │
-├────────────┴────────────┴───────────────────┤
-│                                             │
-│        Security Activity Timeline           │
-│                                             │
-├─────────────────────────────────────────────┤
-│                                             │
-│        Agent Behavioral Analytics           │
-│                                             │
-├─────────────────────────────────────────────┤
-│                                             │
-│        Anomalous Agent Investigation        │
-│                                             │
-├─────────────────────────────────────────────┤
-│                                             │
-│        Security Event Investigation         │
-│                                             │
-└─────────────────────────────────────────────┘
+Runtime artifacts should remain excluded from version control.
 
 ---
 
-🔒 Privacy & Security
+# 🛠️ Technology Stack
 
-The repository should never contain:
+| Technology       | Role                          |
+| ---------------- | ----------------------------- |
+| **Python**       | Core security framework       |
+| **SQLite**       | Audit and behavioral data     |
+| **Streamlit**    | Security monitoring interface |
+| **Pandas**       | Data processing               |
+| **Pytest**       | Security testing              |
+| **Scikit-learn** | ML/anomaly detection research |
+| **Git**          | Version control               |
+| **GitHub**       | Research/project repository   |
 
-Passwords
-API Keys
-Access Tokens
-Private Credentials
-Production Databases
-Sensitive Logs
-Personal Data
-Cloud Secrets
-
-Use environment variables for sensitive configuration.
-
-Example:
-
-.env
-
-The ".env" file should remain excluded from version control.
+Additional technologies may be introduced during the research phase when justified by experimental requirements.
 
 ---
 
-⚠️ Research Limitations
+# 🚀 Getting Started
 
-AegisGuard has several important limitations.
+## Clone
 
-ML Limitations
-
-Anomaly detection does not inherently determine malicious intent.
-
-Dataset Limitations
-
-Synthetic or limited datasets may not represent real-world AI-agent behavior.
-
-False Positives
-
-Legitimate changes in agent behavior may appear anomalous.
-
-False Negatives
-
-Sophisticated attacks may mimic normal behavior.
-
-Concept Drift
-
-Agent behavior can naturally change over time.
-
-Security Boundary
-
-AegisGuard should not be treated as a complete replacement for operating-system, cloud, network, application, or identity security controls.
-
----
-
-🚀 Future Research
-
-Potential extensions include:
-
-- Federated behavioral learning
-- Graph-based agent behavior modeling
-- Multi-agent attack detection
-- Agent identity attestation
-- Trusted execution environments
-- Secure agent-to-agent communication
-- Continuous authorization
-- Adaptive policy enforcement
-- Threat-intelligence integration
-- SIEM integration
-- Cloud-native deployment
-- Kubernetes security
-- Real-time streaming analytics
-- Graph neural networks
-- Explainable AI
-- Adversarial ML defense
-- Reinforcement-learning-based policy optimization
-
----
-
-📜 Research Deliverables
-
-The final 90-day project is intended to produce:
-
-✓ Working AegisGuard security platform
-✓ Authorization engine
-✓ Risk engine
-✓ Audit system
-✓ Behavioral analytics
-✓ Anomaly detection
-✓ ML-assisted detection
-✓ Security dashboard
-✓ Attack simulation framework
-✓ Evaluation dataset
-✓ Experimental results
-✓ Performance benchmarks
-✓ Architecture documentation
-✓ Threat model
-✓ Research methodology
-✓ Limitations analysis
-✓ Final research report
-
----
-
-📁 Repository Organization
-
-The repository is organized to separate:
-
-Production Code
-Research Experiments
-Security Tests
-Documentation
-Datasets
-Models
-Results
-Runtime Data
-
-Generated runtime data should not be committed to the repository.
-
----
-
-▶️ Quick Start
-
-Clone the repository:
-
+```powershell
 git clone <YOUR_GITHUB_REPOSITORY_URL>
 cd aegis-agent-firewall
+```
 
-Create a virtual environment:
+## Create environment
 
+```powershell
 python -m venv .venv
+```
 
-Windows:
+Activate:
 
+```powershell
 .\.venv\Scripts\Activate.ps1
+```
 
-Install dependencies:
+## Install dependencies
 
+```powershell
 pip install -r requirements.txt
+```
 
-Run tests:
+## Run tests
 
+```powershell
 python -m pytest -q
+```
 
-Launch the dashboard:
+## Start dashboard
 
+```powershell
 python -m streamlit run dashboard.py
+```
 
 Open:
 
+```text
 http://localhost:8501
+```
 
 ---
 
-🧪 Development Philosophy
+# 🔄 90-Day Research Roadmap
 
-AegisGuard follows an incremental research-development methodology:
+The project is structured as an approximately **62–90 day research and development program**.
 
-Implement
-   ↓
-Test
-   ↓
-Attack
-   ↓
-Measure
-   ↓
-Analyze
-   ↓
-Improve
-   ↓
-Document
-   ↓
-Repeat
+## Phase I — Security Foundation
 
-Every major feature should be:
+**Days 1–15**
 
-1. Implemented
-2. Unit tested
-3. Security tested
-4. Experimentally evaluated where applicable
-5. Documented
-6. Committed to version control
+* Project architecture
+* Agent identity
+* Authorization
+* Policy enforcement
+* Risk scoring
+* Security testing
+* Audit logging
+* Security analytics
+* Behavioral rules
+* Initial monitoring dashboard
+
+### Milestone
+
+**Deterministic Agent Security + Security Monitoring**
 
 ---
 
-📌 Current Project Status
+## Phase II — Security Intelligence
 
-Project: AegisGuard
+**Days 16–30**
 
-Type: AI-Agent Cybersecurity Research Platform
+* Advanced dashboard
+* Investigation workflows
+* Behavioral feature engineering
+* Agent profiling
+* Anomaly detection
+* Initial ML experiments
 
-Development Duration: 62–90 days
+### Milestone
 
-Current Development Stage: Foundation → Advanced Security Research
+**Behavior-Aware Agent Security**
 
-Current Completed Stage: Day 15
+---
 
-Next Stage: Days 16–20
+## Phase III — Detection Research
 
-Primary Research Areas:
+**Days 31–45**
 
-AI Agent Security
+* Dataset generation
+* Controlled attack scenarios
+* Behavioral baselines
+* Multiple anomaly-detection algorithms
+* Model comparison
+* False-positive analysis
+* Detection threshold experiments
+
+### Milestone
+
+**Experimental Anomaly Detection Framework**
+
+---
+
+## Phase IV — Advanced Agent Security
+
+**Days 46–60**
+
+* Temporal behavior analysis
+* Sequence-based features
+* Agent trust modeling
+* Security event correlation
+* Explainable anomaly signals
+* Advanced attack simulations
+
+### Milestone
+
+**Adaptive Agent Security Intelligence**
+
+---
+
+## Phase V — Research Evaluation
+
+**Days 61–75**
+
+* Experimental design
+* Baseline comparison
+* Dataset preparation
+* Statistical evaluation
+* Performance benchmarking
+* Security effectiveness analysis
+* Ablation studies
+
+### Milestone
+
+**Research-Validated Security Architecture**
+
+---
+
+## Phase VI — Final Research & Publication
+
+**Days 76–90**
+
+* Final experiments
+* Results analysis
+* Architecture refinement
+* Threat-model documentation
+* Limitations
+* Research conclusions
+* Final dashboard
+* Technical documentation
+* Research paper preparation
+* Final demonstration
+
+### Final Milestone
+
+**Research-Level AegisGuard Prototype**
+
+---
+
+# 📚 Research Deliverables
+
+The final project is intended to produce more than source code.
+
+Expected deliverables include:
+
+```text
+✓ Working security framework
+✓ Security monitoring dashboard
+✓ Automated security test suite
+✓ Behavioral feature pipeline
+✓ Anomaly detection experiments
+✓ Security dataset
+✓ Threat model
+✓ Experimental methodology
+✓ Benchmark results
+✓ Model comparison
+✓ False-positive analysis
+✓ Architecture documentation
+✓ Research report
+✓ Final technical demonstration
+```
+
+---
+
+# 🔒 Security & Privacy Considerations
+
+AegisGuard should follow secure development principles.
+
+Sensitive information should never be hardcoded into source code.
+
+Do not commit:
+
+```text
+.env
+credentials
+API keys
+private tokens
+database files
+local audit logs
+generated secrets
+```
+
+The project should use synthetic or controlled data during experimentation unless appropriate authorization exists for real-world data.
+
+---
+
+# ⚠️ Limitations
+
+AegisGuard is a research prototype and should not currently be represented as a complete production-grade AI security gateway.
+
+Important limitations include:
+
+* ML anomaly detection can produce false positives.
+* Behavioral baselines may be incomplete.
+* Synthetic datasets may not represent real-world attacks.
+* Risk scores are not proof of malicious intent.
+* Detection performance depends on feature quality.
+* Novel attacks may evade existing rules and models.
+* Autonomous-agent behavior can be highly context dependent.
+
+These limitations are part of the research problem rather than something to hide.
+
+---
+
+# 🌐 Future Research Directions
+
+Potential extensions include:
+
+* Real-time agent security enforcement
+* Agent-to-agent trust analysis
+* Temporal graph-based behavior modeling
+* Reinforcement-learning-based security adaptation
+* Explainable AI for security decisions
+* LLM-assisted security investigation
+* Threat intelligence integration
+* SIEM integration
+* Splunk integration
+* Cloud IAM integration
+* Kubernetes/container security
+* Multi-agent attack detection
+* Agent supply-chain security
+* Tool-use security
+* Prompt-injection-aware authorization
+* Privilege escalation detection
+* Continuous trust evaluation
+
+---
+
+# 🧠 Research Contribution
+
+The central research direction of AegisGuard is the combination of:
+
+```text
+        STATIC SECURITY
+              │
+              ▼
+       Authorization
+              │
+              +
+        Risk Assessment
+              │
+              +
+        Audit Evidence
+              │
+              ▼
+      BEHAVIORAL SECURITY
+              │
+              ▼
+      Agent Profiling
+              │
+              +
+      Anomaly Detection
+              │
+              ▼
+       SECURITY INTELLIGENCE
+```
+
+The project investigates whether autonomous-agent security can be strengthened by moving from:
+
+> **"Is this action permitted?"**
+
+toward:
+
+> **"Is this action permitted, appropriate for the current context, consistent with the agent's behavior, and supported by the available security evidence?"**
+
+That transition—from **static authorization to continuous, behavior-aware security intelligence**—is the core research motivation behind AegisGuard.
+
+---
+
+# 📌 Project Status
+
+**Project:** AegisGuard
+
+**Category:** Cybersecurity / AI Security / Autonomous Agent Security
+
+**Type:** Research & Development Project
+
+**Planned Duration:** 62–90 Days
+
+**Current Development Stage:** Security Foundation → Behavioral Intelligence
+
+**Current Focus:**
+
+```text
 Authorization
-Risk-Based Security
++
+Risk Assessment
++
+Audit Logging
++
 Behavioral Analytics
++
 Anomaly Detection
-Machine Learning
-Adversarial Security
++
 Security Monitoring
-Explainable AI
-Cybersecurity Research
+```
 
 ---
 
-👩‍💻 Author
+# 👤 Author
 
-Catherina Jercy
+**Catherina Jercy**
 
-Cyber Security Engineering Student
+Cyber Security Engineering
 
 GitHub:
-
-"https://github.com/catherinajercy2007"
-
----
-
-📄 License
-
-This project is intended primarily for educational, research, and experimental cybersecurity purposes.
-
-A suitable open-source license should be added to the repository before public distribution.
+`https://github.com/catherinajercy2007`
 
 ---
 
-⚠️ Disclaimer
+# 📜 Disclaimer
 
-AegisGuard is a research and educational cybersecurity platform.
+AegisGuard is an educational and research-oriented cybersecurity project developed for experimentation, security engineering, and academic research.
 
-It is not guaranteed to detect all malicious activity and should not be deployed as the sole security mechanism for production systems.
-
-Security decisions should be validated against the specific threat model, environment, data sensitivity, and operational requirements of the deployment.
+The framework should not be considered a complete production security solution without additional security review, threat modeling, validation, performance testing, and deployment hardening.
 
 ---
 
-⭐ Project Vision
+## ⭐ If You Find This Project Interesting
 
-«AegisGuard aims to evolve from a deterministic AI-agent authorization firewall into an intelligent, explainable, behavior-aware security platform capable of continuously evaluating agent activity and identifying potentially dangerous deviations.»
+AegisGuard is being developed as a long-term research project exploring the intersection of:
 
-                    AEGISGUARD
+**Cybersecurity × AI Agents × Authorization × Behavioral Analytics × Anomaly Detection × Security Engineering**
 
-              "Trust, but continuously verify."
-
-        Authorization
-               +
-             Risk
-               +
-             Audit
-               +
-           Behavior
-               +
-           Anomaly
-               +
-              ML
-               +
-        Threat Correlation
-               ↓
-       AI Agent Security
+Contributions, research discussions, technical feedback, and collaboration are welcome.

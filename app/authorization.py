@@ -1,3 +1,4 @@
+from app.security import validate_authorization_request
 from app.identity import (
     verify_agent,
     verify_task,
@@ -54,8 +55,27 @@ class AuthorizationService:
         task_id: str,
         action: str,
         resource: str,
+        
     ):
+        security_valid, security_reason = (
+            validate_authorization_request(
+                agent_id=agent_id,
+                api_key=api_key,
+                task_id=task_id,
+                action=action,
+                resource=resource,
+            )
+        )
 
+        if not security_valid:
+            return AuthorizationService._deny(
+                agent_id=agent_id,
+                task_id=task_id,
+                action=action,
+                resource=resource,
+                risk=100,
+                reason=security_reason,
+            )
         # ====================================================
         # 1. VERIFY AGENT
         # ====================================================

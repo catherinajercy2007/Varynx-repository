@@ -2,25 +2,7 @@ import re
 from typing import Tuple
 
 
-# ============================================================
-# SECURITY VALIDATION
-# ============================================================
-
 class SecurityValidator:
-    """
-    Basic security validation utilities for AegisGuard.
-
-    This module validates:
-    - agent IDs
-    - task IDs
-    - actions
-    - resources
-    - API keys
-    """
-
-    # --------------------------------------------------------
-    # VALIDATION PATTERNS
-    # --------------------------------------------------------
 
     AGENT_ID_PATTERN = re.compile(
         r"^[a-zA-Z0-9][a-zA-Z0-9_-]{2,63}$"
@@ -38,10 +20,6 @@ class SecurityValidator:
         r"^[A-Za-z0-9_-]{20,200}$"
     )
 
-    # --------------------------------------------------------
-    # AGENT ID
-    # --------------------------------------------------------
-
     @staticmethod
     def validate_agent_id(
         agent_id: str
@@ -56,16 +34,10 @@ class SecurityValidator:
         if len(agent_id) > 64:
             return False, "Agent ID is too long"
 
-        if not SecurityValidator.AGENT_ID_PATTERN.fullmatch(
-            agent_id
-        ):
+        if not SecurityValidator.AGENT_ID_PATTERN.fullmatch(agent_id):
             return False, "Invalid agent ID format"
 
         return True, "Valid agent ID"
-
-    # --------------------------------------------------------
-    # TASK ID
-    # --------------------------------------------------------
 
     @staticmethod
     def validate_task_id(
@@ -81,16 +53,10 @@ class SecurityValidator:
         if len(task_id) > 64:
             return False, "Task ID is too long"
 
-        if not SecurityValidator.TASK_ID_PATTERN.fullmatch(
-            task_id
-        ):
+        if not SecurityValidator.TASK_ID_PATTERN.fullmatch(task_id):
             return False, "Invalid task ID format"
 
         return True, "Valid task ID"
-
-    # --------------------------------------------------------
-    # ACTION
-    # --------------------------------------------------------
 
     @staticmethod
     def validate_action(
@@ -106,16 +72,10 @@ class SecurityValidator:
         if len(action) > 100:
             return False, "Action is too long"
 
-        if not SecurityValidator.ACTION_PATTERN.fullmatch(
-            action
-        ):
+        if not SecurityValidator.ACTION_PATTERN.fullmatch(action):
             return False, "Invalid action format"
 
         return True, "Valid action"
-
-    # --------------------------------------------------------
-    # RESOURCE
-    # --------------------------------------------------------
 
     @staticmethod
     def validate_resource(
@@ -131,15 +91,12 @@ class SecurityValidator:
         if len(resource) > 500:
             return False, "Resource is too long"
 
-        # Prevent path traversal.
-        if ".." in resource:
-            return False, "Path traversal detected"
-
-        # Prevent null-byte injection.
         if "\x00" in resource:
             return False, "Null byte detected"
 
-        # Prevent control characters.
+        if ".." in resource:
+            return False, "Path traversal detected"
+
         if any(
             ord(character) < 32
             for character in resource
@@ -148,10 +105,6 @@ class SecurityValidator:
             return False, "Invalid control character detected"
 
         return True, "Valid resource"
-
-    # --------------------------------------------------------
-    # API KEY
-    # --------------------------------------------------------
 
     @staticmethod
     def validate_api_key(
@@ -164,16 +117,10 @@ class SecurityValidator:
         if not api_key:
             return False, "API key cannot be empty"
 
-        if not SecurityValidator.API_KEY_PATTERN.fullmatch(
-            api_key
-        ):
+        if not SecurityValidator.API_KEY_PATTERN.fullmatch(api_key):
             return False, "Invalid API key format"
 
         return True, "Valid API key"
-
-    # --------------------------------------------------------
-    # COMPLETE REQUEST
-    # --------------------------------------------------------
 
     @staticmethod
     def validate_authorization_request(
@@ -185,25 +132,11 @@ class SecurityValidator:
     ) -> Tuple[bool, str]:
 
         checks = [
-            SecurityValidator.validate_agent_id(
-                agent_id
-            ),
-
-            SecurityValidator.validate_api_key(
-                api_key
-            ),
-
-            SecurityValidator.validate_task_id(
-                task_id
-            ),
-
-            SecurityValidator.validate_action(
-                action
-            ),
-
-            SecurityValidator.validate_resource(
-                resource
-            )
+            SecurityValidator.validate_agent_id(agent_id),
+            SecurityValidator.validate_api_key(api_key),
+            SecurityValidator.validate_task_id(task_id),
+            SecurityValidator.validate_action(action),
+            SecurityValidator.validate_resource(resource),
         ]
 
         for valid, message in checks:
@@ -211,56 +144,7 @@ class SecurityValidator:
             if not valid:
                 return False, message
 
-        return True, "Authorization request passed security validation"
-
-
-# ============================================================
-# CONVENIENCE FUNCTIONS
-# ============================================================
-
-def validate_agent_id(
-    agent_id: str
-) -> Tuple[bool, str]:
-
-    return SecurityValidator.validate_agent_id(
-        agent_id
-    )
-
-
-def validate_task_id(
-    task_id: str
-) -> Tuple[bool, str]:
-
-    return SecurityValidator.validate_task_id(
-        task_id
-    )
-
-
-def validate_action(
-    action: str
-) -> Tuple[bool, str]:
-
-    return SecurityValidator.validate_action(
-        action
-    )
-
-
-def validate_resource(
-    resource: str
-) -> Tuple[bool, str]:
-
-    return SecurityValidator.validate_resource(
-        resource
-    )
-
-
-def validate_api_key(
-    api_key: str
-) -> Tuple[bool, str]:
-
-    return SecurityValidator.validate_api_key(
-        api_key
-    )
+        return True, "Security validation passed"
 
 
 def validate_authorization_request(
@@ -276,5 +160,5 @@ def validate_authorization_request(
         api_key=api_key,
         task_id=task_id,
         action=action,
-        resource=resource
+        resource=resource,
     )

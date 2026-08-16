@@ -42,17 +42,23 @@ st.divider()
 
 
 # ============================================================
-# DATA LOADING
+# LOAD SECURITY DATA
 # ============================================================
 
 try:
+
     total_events = get_total_events()
+
     decisions = get_decision_counts()
+
     risk = get_risk_summary()
+
     agents = get_agent_activity()
+
     high_risk_events = get_high_risk_events()
 
     suspicious_agents = get_suspicious_agents()
+
     repeated_denials = get_repeated_denials()
 
 except Exception as error:
@@ -117,12 +123,14 @@ st.subheader("Security Posture")
 
 metric_1, metric_2, metric_3, metric_4, metric_5 = st.columns(5)
 
+
 with metric_1:
 
     st.metric(
         "Total Events",
         total_events,
     )
+
 
 with metric_2:
 
@@ -131,6 +139,7 @@ with metric_2:
         decisions.get("ALLOW", 0),
     )
 
+
 with metric_3:
 
     st.metric(
@@ -138,12 +147,14 @@ with metric_3:
         decisions.get("DENY", 0),
     )
 
+
 with metric_4:
 
     st.metric(
         "Average Risk",
         risk.get("average_risk", 0),
     )
+
 
 with metric_5:
 
@@ -153,16 +164,16 @@ with metric_5:
     )
 
 
-st.divider()
-
-
 # ============================================================
 # RISK OVERVIEW
 # ============================================================
 
+st.divider()
+
 st.subheader("Risk Overview")
 
 risk_1, risk_2, risk_3, risk_4 = st.columns(4)
+
 
 with risk_1:
 
@@ -171,6 +182,7 @@ with risk_1:
         risk.get("maximum_risk", 0),
     )
 
+
 with risk_2:
 
     st.metric(
@@ -178,12 +190,14 @@ with risk_2:
         risk.get("high_risk_events", 0),
     )
 
+
 with risk_3:
 
     st.metric(
         "Suspicious Agents",
         len(suspicious_agents),
     )
+
 
 with risk_4:
 
@@ -194,7 +208,7 @@ with risk_4:
 
 
 # ============================================================
-# DECISION + RISK DISTRIBUTION
+# AUTHORIZATION + RISK INDICATORS
 # ============================================================
 
 st.divider()
@@ -202,9 +216,9 @@ st.divider()
 left_col, right_col = st.columns(2)
 
 
-# ------------------------------------------------------------
+# ============================================================
 # AUTHORIZATION DECISIONS
-# ------------------------------------------------------------
+# ============================================================
 
 with left_col:
 
@@ -231,49 +245,40 @@ with left_col:
         )
 
 
-# ------------------------------------------------------------
-# RISK DISTRIBUTION
-# ------------------------------------------------------------
+# ============================================================
+# RISK SECURITY INDICATORS
+# ============================================================
 
 with right_col:
 
-    st.subheader("Risk Distribution")
+    st.subheader("Risk Security Indicators")
 
-    risk_distribution = pd.DataFrame(
+    risk_indicator_data = pd.DataFrame(
         {
-            "Risk Level": [
-                "Low",
-                "Medium",
-                "High",
-                "Critical",
+            "Indicator": [
+                "Average Risk",
+                "Maximum Risk",
+                "High-Risk Events",
+                "Critical Events",
             ],
-            "Events": [
-                risk.get("low_risk_events", 0),
-                risk.get("medium_risk_events", 0),
+            "Value": [
+                risk.get("average_risk", 0),
+                risk.get("maximum_risk", 0),
                 risk.get("high_risk_events", 0),
                 risk.get("critical_events", 0),
             ],
         }
     )
 
-    risk_distribution = risk_distribution[
-        risk_distribution["Events"] > 0
-    ]
+    st.bar_chart(
+        risk_indicator_data.set_index("Indicator"),
+        width="stretch",
+    )
 
-    if not risk_distribution.empty:
-
-        st.bar_chart(
-            risk_distribution.set_index(
-                "Risk Level"
-            ),
-            width="stretch",
-        )
-
-    else:
-
-        st.info(
-            "No risk distribution data available."
-        )
+    st.caption(
+        "Risk indicators are derived from the "
+        "current AegisGuard analytics layer."
+    )
 
 
 # ============================================================
@@ -288,13 +293,116 @@ if show_agent_activity:
 
     if agents:
 
+        # ----------------------------------------------------
+        # CREATE AGENT DATAFRAME
+        # ----------------------------------------------------
+
         agent_df = pd.DataFrame(agents)
+
+        # ----------------------------------------------------
+        # AGENT ACTIVITY TABLE
+        # ----------------------------------------------------
 
         st.dataframe(
             agent_df,
             width="stretch",
             hide_index=True,
         )
+
+        # ----------------------------------------------------
+        # AGENT RISK RANKING
+        # ----------------------------------------------------
+
+        if "maximum_risk" in agent_df.columns:
+
+            st.subheader("Agent Risk Ranking")
+
+            ranking_columns = [
+                column
+                for column in [
+                    "agent_id",
+                    "total_requests",
+                    "denied_requests",
+                    "maximum_risk",
+                ]
+                if column in agent_df.columns
+            ]
+
+            ranked_agents = (
+                agent_df[ranking_columns]
+                .sort_values(
+                    by="maximum_risk",
+                    ascending=False,
+                )
+            )
+
+            st.bar_chart(
+                ranked_agents.set_index("agent_id")[
+                    "maximum_risk"
+                ],
+                width="stretch",
+            )
+
+        # ----------------------------------------------------
+        # AGENT DENIAL RATE
+        # ----------------------------------------------------
+
+        if {
+            "total_requests",
+            "denied_requests",
+        }.issubset(agent_df.columns):
+
+            # Avoid division by zero
+            agent_df["denial_rate"] = 0.0
+
+            valid_requests = (
+                agent_df["total_requests"] > 0
+            )
+
+            agent_df.loc[
+                valid_requests,
+                "denial_rate",
+            ] = (
+                agent_df.loc[
+                    valid_requests,
+                    "denied_requests",
+                ]
+                / agent_df.loc[
+                    valid_requests,
+                    "total_requests",
+                ]
+            )
+
+            agent_df["denial_rate"] = (
+                agent_df["denial_rate"] * 100
+            ).round(2)
+
+            st.subheader("Agent Denial Rate")
+
+            denial_rate_df = (
+                agent_df[
+                    [
+                        "agent_id",
+                        "denial_rate",
+                    ]
+                ]
+                .sort_values(
+                    by="denial_rate",
+                    ascending=False,
+                )
+            )
+
+            st.bar_chart(
+                denial_rate_df.set_index(
+                    "agent_id"
+                ),
+                width="stretch",
+            )
+
+            st.caption(
+                "Denial rate represents the percentage of "
+                "observed requests denied for each agent."
+            )
 
     else:
 
@@ -340,7 +448,9 @@ if show_repeated_denials:
 
     st.divider()
 
-    st.subheader("⚠️ Repeated Authorization Denials")
+    st.subheader(
+        "⚠️ Repeated Authorization Denials"
+    )
 
     if repeated_denials:
 
@@ -369,7 +479,9 @@ if show_high_risk:
 
     st.divider()
 
-    st.subheader("🔥 High-Risk Security Events")
+    st.subheader(
+        "🔥 High-Risk Security Events"
+    )
 
     if high_risk_events:
 
@@ -391,15 +503,19 @@ if show_high_risk:
 
 
 # ============================================================
-# SECURITY SUMMARY
+# SECURITY INTELLIGENCE SUMMARY
 # ============================================================
 
 st.divider()
 
-st.subheader("Security Summary")
+st.subheader("Security Intelligence Summary")
 
 summary_col1, summary_col2 = st.columns(2)
 
+
+# ------------------------------------------------------------
+# CURRENT PROTECTION
+# ------------------------------------------------------------
 
 with summary_col1:
 
@@ -409,28 +525,109 @@ with summary_col1:
 
         - Identity and authorization
         - Policy enforcement
-        - Risk assessment
+        - Contextual risk assessment
         - Security audit logging
+        - Security analytics
         - Behavioral security analytics
         - Suspicious-agent detection
+        - Repeated-denial detection
         - High-risk event monitoring
         """
     )
 
 
+# ------------------------------------------------------------
+# RESEARCH ROADMAP
+# ------------------------------------------------------------
+
 with summary_col2:
 
     st.markdown(
         """
-        ### Research Direction
+        ### Research Evolution
 
-        **Current:** Deterministic security + behavioral analytics
+        **Current — Day 16**
 
-        **Next:** Feature engineering + anomaly detection
+        Deterministic security + behavioral monitoring
 
-        **Future:** Explainable ML-assisted security intelligence
+        **Next — Days 17–18**
+
+        Security investigation + behavioral feature engineering
+
+        **Next — Day 19**
+
+        Anomaly detection research
+
+        **Next — Day 20**
+
+        Integrated behavioral + anomaly intelligence
         """
     )
+
+
+# ============================================================
+# CURRENT SECURITY STATE
+# ============================================================
+
+st.divider()
+
+st.subheader("Current Security State")
+
+total_denied = decisions.get("DENY", 0)
+total_allowed = decisions.get("ALLOW", 0)
+
+if total_events > 0:
+
+    denial_percentage = (
+        total_denied / total_events
+    ) * 100
+
+    allow_percentage = (
+        total_allowed / total_events
+    ) * 100
+
+    state_col1, state_col2, state_col3 = st.columns(3)
+
+    with state_col1:
+
+        st.metric(
+            "Authorization Denial Rate",
+            f"{denial_percentage:.2f}%",
+        )
+
+    with state_col2:
+
+        st.metric(
+            "Authorization Allow Rate",
+            f"{allow_percentage:.2f}%",
+        )
+
+    with state_col3:
+
+        st.metric(
+            "Agents Observed",
+            len(agents),
+        )
+
+else:
+
+    st.info(
+        "No security events are currently available."
+    )
+
+
+# ============================================================
+# RESEARCH NOTE
+# ============================================================
+
+st.divider()
+
+st.info(
+    "Research note: Current dashboard metrics represent "
+    "development and security-test telemetry. Controlled "
+    "datasets with ground-truth labels will be introduced "
+    "during the experimental research phases."
+)
 
 
 # ============================================================

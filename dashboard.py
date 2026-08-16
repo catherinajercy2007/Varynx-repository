@@ -3,7 +3,7 @@ import pandas as pd
 
 
 # ============================================================
-# AEGISGUARD ANALYTICS
+# AEGISGUARD — CORE ANALYTICS
 # ============================================================
 
 from app.analytics import (
@@ -16,7 +16,7 @@ from app.analytics import (
 
 
 # ============================================================
-# AEGISGUARD BEHAVIOR ANALYTICS
+# AEGISGUARD — BEHAVIOR ANALYTICS
 # ============================================================
 
 from app.behavior import (
@@ -26,7 +26,7 @@ from app.behavior import (
 
 
 # ============================================================
-# AEGISGUARD INVESTIGATION
+# AEGISGUARD — INVESTIGATION ENGINE
 # ============================================================
 
 from app.investigation import (
@@ -37,12 +37,22 @@ from app.investigation import (
 
 
 # ============================================================
-# AEGISGUARD BEHAVIORAL FEATURES
+# AEGISGUARD — BEHAVIORAL FEATURES
 # ============================================================
 
 from app.features import (
     get_behavioral_features,
     get_behavior_feature_names,
+)
+
+
+# ============================================================
+# AEGISGUARD — ANOMALY DETECTION
+# ============================================================
+
+from app.anomaly import (
+    get_behavioral_anomalies,
+    get_anomaly_summary,
 )
 
 
@@ -63,12 +73,10 @@ st.set_page_config(
 # ============================================================
 
 if "investigation_results" not in st.session_state:
-
     st.session_state.investigation_results = []
 
 
 if "investigation_executed" not in st.session_state:
-
     st.session_state.investigation_executed = False
 
 
@@ -82,8 +90,8 @@ st.title(
 
 st.caption(
     "Behavior-aware authorization, security analytics, "
-    "agent monitoring, investigation and behavioral "
-    "feature intelligence"
+    "event investigation, behavioral feature engineering "
+    "and anomaly detection"
 )
 
 st.divider()
@@ -122,6 +130,11 @@ with st.sidebar:
         value=True,
     )
 
+    show_anomaly_detection = st.checkbox(
+        "Anomaly Detection",
+        value=True,
+    )
+
     show_suspicious_agents = st.checkbox(
         "Suspicious Agents",
         value=True,
@@ -153,7 +166,7 @@ with st.sidebar:
 
         **Day 17**
 
-        Investigation
+        Security Investigation
 
         ↓
 
@@ -182,7 +195,7 @@ with st.sidebar:
     )
 
     st.caption(
-        "Day 18 • Behavioral Feature Engineering"
+        "Day 19 • Behavioral Anomaly Detection"
     )
 
 
@@ -338,7 +351,7 @@ with risk_4:
 
 
 # ============================================================
-# AUTHORIZATION + RISK ANALYTICS
+# AUTHORIZATION ANALYTICS
 # ============================================================
 
 st.divider()
@@ -347,10 +360,6 @@ authorization_col, risk_col = (
     st.columns(2)
 )
 
-
-# ============================================================
-# AUTHORIZATION DECISIONS
-# ============================================================
 
 with authorization_col:
 
@@ -384,10 +393,6 @@ with authorization_col:
             "No authorization decisions available."
         )
 
-
-# ============================================================
-# RISK INDICATORS
-# ============================================================
 
 with risk_col:
 
@@ -445,13 +450,13 @@ if show_investigation:
     )
 
     st.caption(
-        "Investigate individual security events using "
-        "structured event-level filters and evidence."
+        "Investigate individual authorization events "
+        "using structured filters and event-level evidence."
     )
 
 
     # --------------------------------------------------------
-    # LOAD INVESTIGATION FILTER OPTIONS
+    # FILTER OPTIONS
     # --------------------------------------------------------
 
     try:
@@ -463,7 +468,8 @@ if show_investigation:
     except Exception as error:
 
         st.error(
-            f"Unable to load investigation filters: {error}"
+            "Unable to load investigation filters: "
+            f"{error}"
         )
 
         filter_options = {
@@ -581,7 +587,7 @@ if show_investigation:
 
 
     # --------------------------------------------------------
-    # ADVANCED INVESTIGATION CONTROLS
+    # ADVANCED CONTROLS
     # --------------------------------------------------------
 
     with st.expander(
@@ -641,15 +647,15 @@ if show_investigation:
 
 
     # --------------------------------------------------------
-    # INVESTIGATION BUTTONS
+    # ACTION BUTTONS
     # --------------------------------------------------------
 
-    action_1, action_2 = (
+    investigation_button_col, reset_button_col = (
         st.columns(2)
     )
 
 
-    with action_1:
+    with investigation_button_col:
 
         run_investigation = st.button(
             "🔍 Run Investigation",
@@ -658,7 +664,7 @@ if show_investigation:
         )
 
 
-    with action_2:
+    with reset_button_col:
 
         reset_investigation = st.button(
             "↺ Reset Investigation",
@@ -680,7 +686,7 @@ if show_investigation:
 
 
     # --------------------------------------------------------
-    # RUN INVESTIGATION
+    # EXECUTE INVESTIGATION
     # --------------------------------------------------------
 
     if (
@@ -837,7 +843,7 @@ if show_investigation:
 
 
         # ----------------------------------------------------
-        # RESULTS
+        # RESULTS TABLE
         # ----------------------------------------------------
 
         if investigation_results:
@@ -962,10 +968,6 @@ if show_investigation:
 
                 else:
 
-                    # ----------------------------------------
-                    # EVENT CONTEXT
-                    # ----------------------------------------
-
                     detail_1, detail_2 = (
                         st.columns(2)
                     )
@@ -1044,7 +1046,7 @@ if show_investigation:
 
 
                     # ----------------------------------------
-                    # INVESTIGATION EVIDENCE
+                    # EVIDENCE
                     # ----------------------------------------
 
                     st.markdown(
@@ -1053,7 +1055,6 @@ if show_investigation:
 
 
                     evidence_rows = [
-
                         {
                             "Evidence Field": "Event ID",
                             "Observed Value": str(
@@ -1063,7 +1064,6 @@ if show_investigation:
                                 )
                             ),
                         },
-
                         {
                             "Evidence Field": "Timestamp",
                             "Observed Value": str(
@@ -1073,7 +1073,6 @@ if show_investigation:
                                 )
                             ),
                         },
-
                         {
                             "Evidence Field": "Agent",
                             "Observed Value": str(
@@ -1083,7 +1082,6 @@ if show_investigation:
                                 )
                             ),
                         },
-
                         {
                             "Evidence Field": "Task",
                             "Observed Value": str(
@@ -1093,7 +1091,6 @@ if show_investigation:
                                 )
                             ),
                         },
-
                         {
                             "Evidence Field": "Action",
                             "Observed Value": str(
@@ -1103,7 +1100,6 @@ if show_investigation:
                                 )
                             ),
                         },
-
                         {
                             "Evidence Field": "Resource",
                             "Observed Value": str(
@@ -1113,7 +1109,6 @@ if show_investigation:
                                 )
                             ),
                         },
-
                         {
                             "Evidence Field": "Decision",
                             "Observed Value": str(
@@ -1123,7 +1118,6 @@ if show_investigation:
                                 )
                             ),
                         },
-
                         {
                             "Evidence Field": "Risk",
                             "Observed Value": str(
@@ -1133,7 +1127,6 @@ if show_investigation:
                                 )
                             ),
                         },
-
                         {
                             "Evidence Field": "Reason",
                             "Observed Value": str(
@@ -1200,10 +1193,6 @@ if show_behavioral_features:
     )
 
 
-    # --------------------------------------------------------
-    # LOAD BEHAVIORAL FEATURES
-    # --------------------------------------------------------
-
     try:
 
         behavioral_features = (
@@ -1236,12 +1225,12 @@ if show_behavioral_features:
         )
 
 
-        behavior_metric_1, behavior_metric_2, behavior_metric_3, behavior_metric_4 = (
+        behavior_1, behavior_2, behavior_3, behavior_4 = (
             st.columns(4)
         )
 
 
-        with behavior_metric_1:
+        with behavior_1:
 
             st.metric(
                 "Agents Profiled",
@@ -1251,7 +1240,7 @@ if show_behavioral_features:
             )
 
 
-        with behavior_metric_2:
+        with behavior_2:
 
             mean_agent_risk = round(
                 float(
@@ -1268,7 +1257,7 @@ if show_behavioral_features:
             )
 
 
-        with behavior_metric_3:
+        with behavior_3:
 
             high_denial_agents = int(
                 (
@@ -1285,7 +1274,7 @@ if show_behavioral_features:
             )
 
 
-        with behavior_metric_4:
+        with behavior_4:
 
             critical_behavior_agents = int(
                 (
@@ -1310,12 +1299,6 @@ if show_behavioral_features:
             "Behavioral Feature Matrix"
         )
 
-        st.caption(
-            "Each row represents the measured behavioral "
-            "profile of one observed agent."
-        )
-
-
         st.dataframe(
             behavior_df,
             width="stretch",
@@ -1324,7 +1307,7 @@ if show_behavioral_features:
 
 
         # ----------------------------------------------------
-        # FEATURE SELECTOR
+        # FEATURE EXPLORER
         # ----------------------------------------------------
 
         st.subheader(
@@ -1495,7 +1478,7 @@ if show_behavioral_features:
         # HIGH-RISK BEHAVIOR
         # ----------------------------------------------------
 
-        high_risk_feature_columns = [
+        high_risk_columns = [
             "agent_id",
             "high_risk_requests",
             "critical_requests",
@@ -1506,7 +1489,7 @@ if show_behavioral_features:
             column
             in behavior_df.columns
             for column
-            in high_risk_feature_columns
+            in high_risk_columns
         ):
 
             st.subheader(
@@ -1516,7 +1499,7 @@ if show_behavioral_features:
 
             high_risk_behavior_df = (
                 behavior_df[
-                    high_risk_feature_columns
+                    high_risk_columns
                 ]
                 .set_index(
                     "agent_id"
@@ -1531,7 +1514,7 @@ if show_behavioral_features:
 
 
         # ----------------------------------------------------
-        # BEHAVIORAL RESEARCH INTERPRETATION
+        # FEATURE INTERPRETATION
         # ----------------------------------------------------
 
         st.subheader(
@@ -1543,33 +1526,33 @@ if show_behavioral_features:
             """
             **Denial Rate**
 
-            Measures the proportion of requests rejected
-            by the authorization layer.
+            Percentage of observed requests rejected by
+            the authorization layer.
 
             **Average Risk**
 
-            Represents the mean risk score associated with
-            an agent's observed requests.
+            Mean risk score associated with an agent's
+            observed requests.
 
             **Critical Requests**
 
-            Counts requests reaching the critical-risk
+            Number of requests reaching the critical-risk
             threshold.
 
             **Action Diversity**
 
-            Measures how many distinct actions an agent
-            performs relative to its request volume.
+            Breadth of distinct actions performed by an
+            agent relative to request volume.
 
             **Resource Diversity**
 
-            Measures the breadth of resources accessed
-            by an agent relative to its request volume.
+            Breadth of distinct resources accessed by an
+            agent relative to request volume.
 
             **Task Diversity**
 
-            Measures the number of distinct tasks observed
-            for an agent relative to total requests.
+            Breadth of distinct tasks associated with
+            the agent's observed activity.
             """
         )
 
@@ -1582,7 +1565,551 @@ if show_behavioral_features:
 
 
 # ============================================================
-# DAY 16 — AGENT INTELLIGENCE
+# DAY 19 — BEHAVIORAL ANOMALY DETECTION
+# ============================================================
+
+if show_anomaly_detection:
+
+    st.divider()
+
+    st.header(
+        "🚨 Behavioral Anomaly Detection"
+    )
+
+    st.caption(
+        "Statistical baseline for identifying unusual "
+        "agent behavior across engineered security features."
+    )
+
+
+    # --------------------------------------------------------
+    # LOAD ANOMALY DATA
+    # --------------------------------------------------------
+
+    try:
+
+        anomaly_results = (
+            get_behavioral_anomalies()
+        )
+
+        anomaly_summary = (
+            get_anomaly_summary()
+        )
+
+    except Exception as error:
+
+        st.error(
+            "Unable to calculate behavioral anomalies: "
+            f"{error}"
+        )
+
+        anomaly_results = []
+
+        anomaly_summary = {
+            "agents_analyzed": 0,
+            "high_anomaly_agents": 0,
+            "medium_anomaly_agents": 0,
+            "low_anomaly_agents": 0,
+            "normal_agents": 0,
+        }
+
+
+    # --------------------------------------------------------
+    # ANOMALY POSTURE
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Anomaly Detection Posture"
+    )
+
+
+    anomaly_1, anomaly_2, anomaly_3, anomaly_4 = (
+        st.columns(4)
+    )
+
+
+    with anomaly_1:
+
+        st.metric(
+            "Agents Analyzed",
+            anomaly_summary.get(
+                "agents_analyzed",
+                0,
+            ),
+        )
+
+
+    with anomaly_2:
+
+        st.metric(
+            "High Anomaly",
+            anomaly_summary.get(
+                "high_anomaly_agents",
+                0,
+            ),
+        )
+
+
+    with anomaly_3:
+
+        st.metric(
+            "Medium Anomaly",
+            anomaly_summary.get(
+                "medium_anomaly_agents",
+                0,
+            ),
+        )
+
+
+    with anomaly_4:
+
+        st.metric(
+            "Normal",
+            anomaly_summary.get(
+                "normal_agents",
+                0,
+            ),
+        )
+
+
+    # --------------------------------------------------------
+    # ANOMALY RESULTS
+    # --------------------------------------------------------
+
+    if anomaly_results:
+
+        st.subheader(
+            "Agent Anomaly Ranking"
+        )
+
+
+        anomaly_table_rows = []
+
+
+        for item in anomaly_results:
+
+            denial_rate = float(
+                item.get(
+                    "denial_rate",
+                    0,
+                )
+                or 0
+            )
+
+
+            anomaly_table_rows.append(
+                {
+                    "Agent": str(
+                        item.get(
+                            "agent_id",
+                            "",
+                        )
+                    ),
+                    "Anomaly Score": float(
+                        item.get(
+                            "anomaly_score",
+                            0,
+                        )
+                        or 0
+                    ),
+                    "Severity": str(
+                        item.get(
+                            "anomaly_severity",
+                            "NORMAL",
+                        )
+                    ),
+                    "Denial Rate": round(
+                        denial_rate * 100,
+                        2,
+                    ),
+                    "Average Risk": float(
+                        item.get(
+                            "average_risk",
+                            0,
+                        )
+                        or 0
+                    ),
+                    "Maximum Risk": int(
+                        item.get(
+                            "maximum_risk",
+                            0,
+                        )
+                        or 0
+                    ),
+                    "Critical Requests": int(
+                        item.get(
+                            "critical_requests",
+                            0,
+                        )
+                        or 0
+                    ),
+                    "Total Requests": int(
+                        item.get(
+                            "total_requests",
+                            0,
+                        )
+                        or 0
+                    ),
+                }
+            )
+
+
+        anomaly_table = pd.DataFrame(
+            anomaly_table_rows
+        )
+
+
+        st.dataframe(
+            anomaly_table,
+            width="stretch",
+            hide_index=True,
+        )
+
+
+        # ----------------------------------------------------
+        # ANOMALY SCORE CHART
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Behavioral Anomaly Scores"
+        )
+
+
+        anomaly_chart = (
+            anomaly_table[
+                [
+                    "Agent",
+                    "Anomaly Score",
+                ]
+            ]
+            .set_index(
+                "Agent"
+            )
+        )
+
+
+        st.bar_chart(
+            anomaly_chart,
+            width="stretch",
+        )
+
+
+        # ----------------------------------------------------
+        # ANOMALOUS FEATURES
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Anomalous Behavioral Features"
+        )
+
+
+        feature_rows = []
+
+
+        for item in anomaly_results:
+
+            anomalous_features = (
+                item.get(
+                    "anomalous_features",
+                    [],
+                )
+            )
+
+
+            if anomalous_features:
+
+                feature_text = ", ".join(
+                    str(feature)
+                    for feature
+                    in anomalous_features
+                )
+
+            else:
+
+                feature_text = "None"
+
+
+            feature_rows.append(
+                {
+                    "Agent": str(
+                        item.get(
+                            "agent_id",
+                            "",
+                        )
+                    ),
+                    "Severity": str(
+                        item.get(
+                            "anomaly_severity",
+                            "NORMAL",
+                        )
+                    ),
+                    "Anomalous Features": (
+                        feature_text
+                    ),
+                }
+            )
+
+
+        feature_df = pd.DataFrame(
+            feature_rows
+        )
+
+
+        st.dataframe(
+            feature_df,
+            width="stretch",
+            hide_index=True,
+        )
+
+
+        # ----------------------------------------------------
+        # AGENT ANOMALY INVESTIGATION
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Agent Anomaly Investigation"
+        )
+
+
+        anomaly_agents = [
+            str(
+                item.get(
+                    "agent_id",
+                    "",
+                )
+            )
+            for item
+            in anomaly_results
+        ]
+
+
+        selected_anomaly_agent = (
+            st.selectbox(
+                "Select Agent",
+                anomaly_agents,
+                key="selected_anomaly_agent",
+            )
+        )
+
+
+        selected_anomaly = next(
+            (
+                item
+                for item
+                in anomaly_results
+                if str(
+                    item.get(
+                        "agent_id",
+                        "",
+                    )
+                )
+                == selected_anomaly_agent
+            ),
+            None,
+        )
+
+
+        if selected_anomaly:
+
+            anomaly_detail_1, anomaly_detail_2 = (
+                st.columns(2)
+            )
+
+
+            with anomaly_detail_1:
+
+                st.markdown(
+                    "### Behavioral State"
+                )
+
+                st.write(
+                    "**Agent:** "
+                    f"`{selected_anomaly.get('agent_id', '')}`"
+                )
+
+                st.write(
+                    "**Anomaly Score:** "
+                    f"`{selected_anomaly.get('anomaly_score', 0)}`"
+                )
+
+                st.write(
+                    "**Severity:** "
+                    f"`{selected_anomaly.get('anomaly_severity', 'NORMAL')}`"
+                )
+
+                st.write(
+                    "**Total Requests:** "
+                    f"`{selected_anomaly.get('total_requests', 0)}`"
+                )
+
+
+            with anomaly_detail_2:
+
+                st.markdown(
+                    "### Security Indicators"
+                )
+
+                denial_rate = float(
+                    selected_anomaly.get(
+                        "denial_rate",
+                        0,
+                    )
+                    or 0
+                )
+
+
+                st.write(
+                    "**Denial Rate:** "
+                    f"`{denial_rate * 100:.2f}%`"
+                )
+
+                st.write(
+                    "**Average Risk:** "
+                    f"`{selected_anomaly.get('average_risk', 0)}`"
+                )
+
+                st.write(
+                    "**Maximum Risk:** "
+                    f"`{selected_anomaly.get('maximum_risk', 0)}`"
+                )
+
+                st.write(
+                    "**Critical Requests:** "
+                    f"`{selected_anomaly.get('critical_requests', 0)}`"
+                )
+
+
+            # ------------------------------------------------
+            # FEATURE DEVIATIONS
+            # ------------------------------------------------
+
+            st.markdown(
+                "### Feature Deviation Scores"
+            )
+
+
+            feature_scores = (
+                selected_anomaly.get(
+                    "feature_scores",
+                    {},
+                )
+            )
+
+
+            if feature_scores:
+
+                score_rows = []
+
+
+                for feature_name, score in (
+                    feature_scores.items()
+                ):
+
+                    score_rows.append(
+                        {
+                            "Feature": str(
+                                feature_name
+                            ),
+                            "Deviation Score": float(
+                                score
+                            ),
+                        }
+                    )
+
+
+                score_df = pd.DataFrame(
+                    score_rows
+                )
+
+
+                score_df = (
+                    score_df
+                    .sort_values(
+                        by="Deviation Score",
+                        ascending=False,
+                    )
+                )
+
+
+                st.bar_chart(
+                    score_df.set_index(
+                        "Feature"
+                    ),
+                    width="stretch",
+                )
+
+
+                st.dataframe(
+                    score_df,
+                    width="stretch",
+                    hide_index=True,
+                )
+
+
+            else:
+
+                st.info(
+                    "No feature deviation data available."
+                )
+
+
+    else:
+
+        st.info(
+            "No behavioral anomaly results are currently available."
+        )
+
+
+    # --------------------------------------------------------
+    # RESEARCH INTERPRETATION
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Anomaly Detection Interpretation"
+    )
+
+
+    st.markdown(
+        """
+        **Behavioral Baseline**
+
+        The detector establishes an observed behavioral
+        baseline from the engineered agent feature matrix.
+
+        **Deviation Analysis**
+
+        Each agent is compared against the observed
+        population distribution for selected behavioral
+        features.
+
+        **Anomaly Score**
+
+        Feature-level standardized deviations are aggregated
+        into an overall behavioral anomaly score.
+
+        **Severity**
+
+        The current baseline categorizes observations as
+        NORMAL, LOW, MEDIUM or HIGH.
+
+        **Security Architecture**
+
+        Anomaly detection provides security intelligence;
+        it does not replace deterministic authorization,
+        policy enforcement or access-control decisions.
+
+        **Research Status**
+
+        This is a baseline detector. Future experimental
+        phases should compare it against controlled datasets
+        and machine-learning approaches using measurable
+        evaluation metrics.
+        """
+    )
+
+
+# ============================================================
+# AGENT INTELLIGENCE
 # ============================================================
 
 if show_agent_activity:
@@ -1848,59 +2375,57 @@ if show_high_risk:
 
 
 # ============================================================
-# SECURITY INTELLIGENCE SUMMARY
+# RESEARCH PIPELINE SUMMARY
 # ============================================================
 
 st.divider()
 
 st.subheader(
-    "Security Intelligence Summary"
+    "Research Pipeline"
 )
 
 
-summary_col_1, summary_col_2 = (
+pipeline_col_1, pipeline_col_2 = (
     st.columns(2)
 )
 
 
-with summary_col_1:
+with pipeline_col_1:
 
     st.markdown(
         """
-        ### Current Security Layers
+        ### Security Control Plane
 
-        - Identity and authorization
-        - Policy enforcement
-        - Contextual risk assessment
-        - Security audit logging
-        - Security analytics
-        - Behavioral analytics
-        - Event-level investigation
-        - Behavioral feature engineering
-        - Suspicious-agent detection
-        - Repeated-denial detection
-        - High-risk event monitoring
-        """
-    )
+        **Authorization**
 
+        Deterministic policy enforcement
 
-with summary_col_2:
+        ↓
 
-    st.markdown(
-        """
-        ### Research Pipeline
+        **Risk Assessment**
 
-        **Raw Telemetry**
+        Context-aware risk scoring
 
-        Security authorization events
+        ↓
+
+        **Audit Logging**
+
+        Security event persistence
 
         ↓
 
         **Investigation**
 
         Event-level evidence analysis
+        """
+    )
 
-        ↓
+
+with pipeline_col_2:
+
+    st.markdown(
+        """
+        ### Behavioral Intelligence
 
         **Feature Engineering**
 
@@ -1910,13 +2435,19 @@ with summary_col_2:
 
         **Anomaly Detection**
 
-        Statistical / ML-based detection
+        Statistical behavioral baseline
 
         ↓
 
-        **Security Intelligence**
+        **Anomaly Ranking**
 
-        Behavior-aware decision support
+        Agent-level security intelligence
+
+        ↓
+
+        **Future ML Evaluation**
+
+        Controlled anomaly-detection experiments
         """
     )
 
@@ -2004,11 +2535,11 @@ else:
 st.divider()
 
 st.info(
-    "Research note: Behavioral features in this phase "
-    "are deterministic statistical representations derived "
-    "from security telemetry. They are not machine-learning "
-    "predictions. These features will form the input layer "
-    "for controlled anomaly-detection experiments."
+    "Research note: Day 19 uses a transparent statistical "
+    "behavioral anomaly baseline. It is not presented as "
+    "a production ML detector. Deterministic authorization "
+    "remains the enforcement layer, while anomaly detection "
+    "provides additional behavioral security intelligence."
 )
 
 
@@ -2024,5 +2555,5 @@ st.caption(
 )
 
 st.caption(
-    "Research Prototype • Day 18 • Behavioral Feature Engineering"
+    "Research Prototype • Day 19 • Behavioral Anomaly Detection"
 )

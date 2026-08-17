@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import streamlit as st
 import pandas as pd
 
 
 # ============================================================
-# CORE ANALYTICS
+# CORE SECURITY ANALYTICS
 # ============================================================
 
 from app.analytics import (
@@ -66,7 +68,6 @@ from app.scenarios import (
     get_scenario_catalog,
     get_scenarios,
     get_scenario_summary,
-    sample_scenarios,
 )
 
 
@@ -77,11 +78,8 @@ from app.scenarios import (
 from app.attack_scenarios import (
     ATTACK_SCENARIO_TYPES,
     get_attack_scenarios,
-    get_attack_scenario,
     get_attack_scenarios_by_type,
-    get_attack_scenarios_by_severity,
     get_attack_scenario_summary,
-    sample_attack_scenarios,
 )
 
 
@@ -105,7 +103,7 @@ from app.experimental_dataset import (
 # ============================================================
 
 st.set_page_config(
-    page_title="AegisGuard Security Intelligence Center",
+    page_title="AegisGuard Research SOC",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -116,20 +114,20 @@ st.set_page_config(
 # SESSION STATE
 # ============================================================
 
-DEFAULT_STATE = {
-    "investigation_results": [],
-    "investigation_executed": False,
-    "day21_sampled_scenarios": None,
-    "day22_attack_experiment": None,
-    "day23_dataset": None,
-    "day23_dataset_summary": None,
-    "day23_dataset_validation": None,
-}
+if "day23_dataset" not in st.session_state:
+    st.session_state.day23_dataset = None
 
-for key, value in DEFAULT_STATE.items():
+if "day23_summary" not in st.session_state:
+    st.session_state.day23_summary = None
 
-    if key not in st.session_state:
-        st.session_state[key] = value
+if "day23_validation" not in st.session_state:
+    st.session_state.day23_validation = None
+
+if "investigation_results" not in st.session_state:
+    st.session_state.investigation_results = []
+
+if "investigation_executed" not in st.session_state:
+    st.session_state.investigation_executed = False
 
 
 # ============================================================
@@ -154,170 +152,284 @@ def safe_float(value, default=0.0):
         return default
 
 
-def clamp(
-    value,
-    minimum=0.0,
-    maximum=100.0,
+def calculate_binary_metrics(
+    actual_positive,
+    actual_negative,
+    predicted_positive,
+    predicted_negative,
 ):
+    """
+    Calculate standard binary classification metrics.
 
-    return max(
-        minimum,
-        min(
-            maximum,
-            value,
-        ),
-    )
+    Positive class:
+        MALICIOUS
 
+    Negative class:
+        NON-MALICIOUS
+        (BENIGN + SUSPICIOUS)
+    """
 
-def calculate_agent_intelligence(
-    agent,
-    anomaly_lookup,
-    suspicious_lookup,
-):
-
-    agent_id = str(
-        agent.get(
-            "agent_id",
-            "unknown-agent",
+    tp = sum(
+        1
+        for actual, predicted in zip(
+            actual_positive,
+            predicted_positive,
         )
+        if actual and predicted
     )
 
-    total_requests = safe_int(
-        agent.get(
-            "total_requests",
-            0,
+    tn = sum(
+        1
+        for actual, predicted in zip(
+            actual_negative,
+            predicted_negative,
         )
+        if actual and predicted
     )
 
-    denied_requests = safe_int(
-        agent.get(
-            "denied_requests",
-            0,
+    fp = sum(
+        1
+        for actual, predicted in zip(
+            actual_negative,
+            predicted_positive,
         )
+        if actual and predicted
     )
 
-    maximum_risk = safe_float(
-        agent.get(
-            "maximum_risk",
-            0,
+    fn = sum(
+        1
+        for actual, predicted in zip(
+            actual_positive,
+            predicted_negative,
         )
+        if actual and predicted
     )
 
-    denial_rate = (
-        denied_requests / total_requests
-        if total_requests > 0
-        else 0
+    total = (
+        tp + tn + fp + fn
     )
 
-    anomaly = anomaly_lookup.get(
-        agent_id,
-        {},
+    accuracy = (
+        (tp + tn) / total
+        if total
+        else 0.0
     )
 
-    anomaly_score = safe_float(
-        anomaly.get(
-            "anomaly_score",
-            0,
-        )
+    precision = (
+        tp / (tp + fp)
+        if (tp + fp)
+        else 0.0
     )
 
-    anomaly_severity = str(
-        anomaly.get(
-            "anomaly_severity",
-            "NORMAL",
-        )
-    ).upper()
-
-    risk_signal = clamp(
-        maximum_risk
+    recall = (
+        tp / (tp + fn)
+        if (tp + fn)
+        else 0.0
     )
 
-    denial_signal = clamp(
-        denial_rate * 100
+    specificity = (
+        tn / (tn + fp)
+        if (tn + fp)
+        else 0.0
     )
 
-    anomaly_signal = clamp(
-        anomaly_score / 3 * 100
+    f1 = (
+        2
+        * precision
+        * recall
+        / (precision + recall)
+        if (precision + recall)
+        else 0.0
     )
 
-    suspicious_signal = (
-        100
-        if agent_id in suspicious_lookup
-        else 0
+    false_positive_rate = (
+        fp / (fp + tn)
+        if (fp + tn)
+        else 0.0
     )
 
-    severity_bonus = {
-        "NORMAL": 0,
-        "LOW": 5,
-        "MEDIUM": 15,
-        "HIGH": 25,
-    }.get(
-        anomaly_severity,
-        0,
+    false_negative_rate = (
+        fn / (fn + tp)
+        if (fn + tp)
+        else 0.0
     )
-
-    intelligence_score = (
-        risk_signal * 0.35
-        + denial_signal * 0.25
-        + anomaly_signal * 0.25
-        + suspicious_signal * 0.15
-        + severity_bonus
-    )
-
-    intelligence_score = clamp(
-        intelligence_score
-    )
-
-    if intelligence_score >= 80:
-        priority = "CRITICAL"
-
-    elif intelligence_score >= 60:
-        priority = "HIGH"
-
-    elif intelligence_score >= 35:
-        priority = "MEDIUM"
-
-    else:
-        priority = "LOW"
-
-    recommendation = {
-        "CRITICAL":
-            "Immediate investigation and containment review",
-
-        "HIGH":
-            "Prioritize analyst investigation",
-
-        "MEDIUM":
-            "Increase monitoring and review behavior",
-
-        "LOW":
-            "Continue normal monitoring",
-    }[priority]
 
     return {
-        "agent_id": agent_id,
-        "total_requests": total_requests,
-        "denied_requests": denied_requests,
-        "denial_rate": round(
-            denial_rate * 100,
-            2,
-        ),
-        "maximum_risk": round(
-            maximum_risk,
-            2,
-        ),
-        "anomaly_score": round(
-            anomaly_score,
+        "true_positive": tp,
+        "true_negative": tn,
+        "false_positive": fp,
+        "false_negative": fn,
+        "accuracy": round(
+            accuracy,
             4,
         ),
-        "anomaly_severity": anomaly_severity,
-        "intelligence_score": round(
-            intelligence_score,
-            2,
+        "precision": round(
+            precision,
+            4,
         ),
-        "priority": priority,
-        "recommended_action": recommendation,
+        "recall": round(
+            recall,
+            4,
+        ),
+        "specificity": round(
+            specificity,
+            4,
+        ),
+        "f1_score": round(
+            f1,
+            4,
+        ),
+        "false_positive_rate": round(
+            false_positive_rate,
+            4,
+        ),
+        "false_negative_rate": round(
+            false_negative_rate,
+            4,
+        ),
     }
+
+
+def evaluate_dataset(
+    dataset,
+    threshold,
+    prediction_mode,
+):
+    """
+    Evaluate AegisGuard's synthetic detection signal.
+
+    Actual positive:
+        ground_truth == MALICIOUS
+
+    Predicted positive:
+        depends on prediction_mode
+    """
+
+    actual_positive = []
+    actual_negative = []
+    predicted_positive = []
+    predicted_negative = []
+
+    for event in dataset:
+
+        ground_truth = str(
+            event.get(
+                "ground_truth",
+                "",
+            )
+        ).upper()
+
+        risk_score = safe_float(
+            event.get(
+                "risk_score",
+                0,
+            )
+        )
+
+        decision = str(
+            event.get(
+                "decision",
+                "",
+            )
+        ).upper()
+
+        if prediction_mode == "Risk Threshold":
+
+            predicted_attack = (
+                risk_score >= threshold
+            )
+
+        elif prediction_mode == "Authorization Decision":
+
+            predicted_attack = (
+                decision == "DENY"
+            )
+
+        else:
+
+            predicted_attack = (
+                risk_score >= threshold
+                or decision == "DENY"
+            )
+
+        actual_attack = (
+            ground_truth == "MALICIOUS"
+        )
+
+        actual_positive.append(
+            actual_attack
+        )
+
+        actual_negative.append(
+            not actual_attack
+        )
+
+        predicted_positive.append(
+            predicted_attack
+        )
+
+        predicted_negative.append(
+            not predicted_attack
+        )
+
+    return calculate_binary_metrics(
+        actual_positive,
+        actual_negative,
+        predicted_positive,
+        predicted_negative,
+    )
+
+
+def build_threshold_evaluation(
+    dataset,
+    thresholds,
+):
+    """
+    Evaluate detection performance across
+    multiple risk thresholds.
+    """
+
+    rows = []
+
+    for threshold in thresholds:
+
+        metrics = evaluate_dataset(
+            dataset,
+            threshold,
+            "Risk Threshold",
+        )
+
+        rows.append(
+            {
+                "Threshold":
+                    threshold,
+
+                "Accuracy":
+                    metrics["accuracy"],
+
+                "Precision":
+                    metrics["precision"],
+
+                "Recall":
+                    metrics["recall"],
+
+                "F1":
+                    metrics["f1_score"],
+
+                "Specificity":
+                    metrics["specificity"],
+
+                "FPR":
+                    metrics["false_positive_rate"],
+
+                "FNR":
+                    metrics["false_negative_rate"],
+            }
+        )
+
+    return pd.DataFrame(
+        rows
+    )
 
 
 # ============================================================
@@ -325,13 +437,12 @@ def calculate_agent_intelligence(
 # ============================================================
 
 st.title(
-    "🛡️ AegisGuard Security Intelligence Center"
+    "🛡️ AegisGuard Security Research Center"
 )
 
 st.caption(
-    "Behavior-aware security control plane for "
-    "autonomous AI agent authorization, monitoring, "
-    "investigation and reproducible research."
+    "Behavior-aware authorization, security intelligence, "
+    "controlled experimentation and quantitative evaluation"
 )
 
 st.divider()
@@ -344,11 +455,11 @@ st.divider()
 with st.sidebar:
 
     st.header(
-        "Security Intelligence Controls"
+        "Research Control Plane"
     )
 
     st.success(
-        "AegisGuard security engine online"
+        "AegisGuard engine online"
     )
 
     st.divider()
@@ -382,6 +493,11 @@ with st.sidebar:
         value=True,
     )
 
+    show_day24 = st.checkbox(
+        "Day 24 Evaluation Lab",
+        value=True,
+    )
+
     show_anomalies = st.checkbox(
         "Anomaly Detection",
         value=True,
@@ -410,101 +526,110 @@ with st.sidebar:
     st.divider()
 
     st.subheader(
-        "Research Pipeline"
+        "Research Progress"
     )
 
     st.markdown(
         """
         **Days 1–15**
-
         Security Foundation
 
         ↓
 
         **Day 16**
-
         Advanced SOC
 
         ↓
 
         **Day 17**
-
         Investigation
 
         ↓
 
         **Day 18**
-
         Behavioral Features
 
         ↓
 
         **Day 19**
-
         Anomaly Detection
 
         ↓
 
         **Day 20**
-
         Integrated Intelligence
 
         ↓
 
         **Day 21**
-
         Controlled Scenarios
 
         ↓
 
         **Day 22**
-
         Attack Taxonomy
 
         ↓
 
         **Day 23**
-
         Experimental Dataset
+
+        ↓
+
+        **Day 24**
+        Quantitative Evaluation
         """
     )
 
     st.divider()
 
     st.caption(
-        "AegisGuard Research Prototype"
+        f"Dataset: {DATASET_VERSION}"
     )
 
     st.caption(
-        f"Dataset Version: {DATASET_VERSION}"
+        "AegisGuard Research Prototype"
     )
 
 
 # ============================================================
-# LOAD SECURITY DATA
+# LOAD SECURITY TELEMETRY
 # ============================================================
 
 try:
 
-    total_events = get_total_events()
+    total_events = (
+        get_total_events()
+    )
 
-    decisions = get_decision_counts()
+    decisions = (
+        get_decision_counts()
+    )
 
-    risk = get_risk_summary()
+    risk = (
+        get_risk_summary()
+    )
 
-    agents = get_agent_activity()
+    agents = (
+        get_agent_activity()
+    )
 
-    high_risk_events = get_high_risk_events()
+    high_risk_events = (
+        get_high_risk_events()
+    )
 
-    suspicious_agents = get_suspicious_agents()
+    suspicious_agents = (
+        get_suspicious_agents()
+    )
 
-    repeated_denials = get_repeated_denials()
+    repeated_denials = (
+        get_repeated_denials()
+    )
 
 except Exception as error:
 
     st.error(
-        "Unable to load security data: "
-        f"{error}"
+        f"Unable to load security data: {error}"
     )
 
     st.stop()
@@ -526,7 +651,7 @@ except Exception:
 
 
 # ============================================================
-# ANOMALY DATA
+# ANOMALIES
 # ============================================================
 
 try:
@@ -550,53 +675,6 @@ except Exception:
         "low_anomaly_agents": 0,
         "normal_agents": 0,
     }
-
-
-# ============================================================
-# LOOKUPS
-# ============================================================
-
-anomaly_lookup = {
-    str(
-        item.get(
-            "agent_id",
-            "",
-        )
-    ): item
-    for item in anomaly_results
-}
-
-suspicious_lookup = {
-    str(
-        item.get(
-            "agent_id",
-            "",
-        )
-    )
-    for item in suspicious_agents
-}
-
-
-# ============================================================
-# AGENT INTELLIGENCE
-# ============================================================
-
-intelligence_records = []
-
-for agent in agents:
-
-    intelligence_records.append(
-        calculate_agent_intelligence(
-            agent,
-            anomaly_lookup,
-            suspicious_lookup,
-        )
-    )
-
-
-intelligence_df = pd.DataFrame(
-    intelligence_records
-)
 
 
 # ============================================================
@@ -653,7 +731,7 @@ if show_overview:
     with c5:
 
         st.metric(
-            "Critical Events",
+            "Critical",
             risk.get(
                 "critical_events",
                 0,
@@ -696,94 +774,42 @@ if show_overview:
     with r4:
 
         st.metric(
-            "Repeated Denials",
+            "Repeated Denial Patterns",
             len(
                 repeated_denials
             ),
         )
 
-    chart1, chart2 = (
-        st.columns(2)
+    decision_df = pd.DataFrame(
+        {
+            "Decision":
+                list(
+                    decisions.keys()
+                ),
+
+            "Count":
+                list(
+                    decisions.values()
+                ),
+        }
     )
 
-    with chart1:
+    if not decision_df.empty:
 
         st.subheader(
             "Authorization Decisions"
         )
 
-        decision_df = pd.DataFrame(
-            {
-                "Decision":
-                    list(
-                        decisions.keys()
-                    ),
-
-                "Count":
-                    list(
-                        decisions.values()
-                    ),
-            }
-        )
-
-        if not decision_df.empty:
-
-            st.bar_chart(
-                decision_df.set_index(
-                    "Decision"
-                ),
-                width="stretch",
-            )
-
-    with chart2:
-
-        st.subheader(
-            "Risk Indicators"
-        )
-
-        risk_df = pd.DataFrame(
-            {
-                "Indicator": [
-                    "Average Risk",
-                    "Maximum Risk",
-                    "High-Risk Events",
-                    "Critical Events",
-                ],
-
-                "Value": [
-                    risk.get(
-                        "average_risk",
-                        0,
-                    ),
-
-                    risk.get(
-                        "maximum_risk",
-                        0,
-                    ),
-
-                    risk.get(
-                        "high_risk_events",
-                        0,
-                    ),
-
-                    risk.get(
-                        "critical_events",
-                        0,
-                    ),
-                ],
-            }
-        )
-
         st.bar_chart(
-            risk_df.set_index(
-                "Indicator"
+            decision_df.set_index(
+                "Decision"
             ),
             width="stretch",
         )
 
 
 # ============================================================
-# DAY 20 — INTEGRATED INTELLIGENCE
+# INTEGRATED INTELLIGENCE
 # ============================================================
 
 if show_intelligence:
@@ -794,86 +820,155 @@ if show_intelligence:
         "🧠 Integrated Security Intelligence"
     )
 
-    st.caption(
-        "Combined authorization, behavioral, risk and "
-        "anomaly signals."
+    intelligence_records = []
+
+    anomaly_lookup = {
+        str(
+            item.get(
+                "agent_id",
+                "",
+            )
+        ): item
+        for item in anomaly_results
+    }
+
+    suspicious_lookup = {
+        str(
+            item.get(
+                "agent_id",
+                "",
+            )
+        )
+        for item in suspicious_agents
+    }
+
+    for agent in agents:
+
+        agent_id = str(
+            agent.get(
+                "agent_id",
+                "",
+            )
+        )
+
+        total = safe_int(
+            agent.get(
+                "total_requests",
+                0,
+            )
+        )
+
+        denied = safe_int(
+            agent.get(
+                "denied_requests",
+                0,
+            )
+        )
+
+        max_risk = safe_float(
+            agent.get(
+                "maximum_risk",
+                0,
+            )
+        )
+
+        denial_rate = (
+            denied / total
+            if total
+            else 0
+        )
+
+        anomaly = (
+            anomaly_lookup.get(
+                agent_id,
+                {},
+            )
+        )
+
+        anomaly_score = safe_float(
+            anomaly.get(
+                "anomaly_score",
+                0,
+            )
+        )
+
+        suspicious_signal = (
+            1
+            if agent_id
+            in suspicious_lookup
+            else 0
+        )
+
+        intelligence_score = (
+            max_risk * 0.40
+            + denial_rate * 100 * 0.30
+            + min(
+                anomaly_score * 20,
+                100,
+            ) * 0.20
+            + suspicious_signal * 100 * 0.10
+        )
+
+        intelligence_score = min(
+            100,
+            intelligence_score,
+        )
+
+        if intelligence_score >= 80:
+
+            priority = "CRITICAL"
+
+        elif intelligence_score >= 60:
+
+            priority = "HIGH"
+
+        elif intelligence_score >= 35:
+
+            priority = "MEDIUM"
+
+        else:
+
+            priority = "LOW"
+
+        intelligence_records.append(
+            {
+                "agent_id":
+                    agent_id,
+
+                "total_requests":
+                    total,
+
+                "denied_requests":
+                    denied,
+
+                "denial_rate":
+                    round(
+                        denial_rate * 100,
+                        2,
+                    ),
+
+                "maximum_risk":
+                    max_risk,
+
+                "anomaly_score":
+                    anomaly_score,
+
+                "intelligence_score":
+                    round(
+                        intelligence_score,
+                        2,
+                    ),
+
+                "priority":
+                    priority,
+            }
+        )
+
+    intelligence_df = pd.DataFrame(
+        intelligence_records
     )
 
     if not intelligence_df.empty:
-
-        priority_counts = (
-            intelligence_df[
-                "priority"
-            ].value_counts()
-        )
-
-        avg_score = round(
-            float(
-                intelligence_df[
-                    "intelligence_score"
-                ].mean()
-            ),
-            2,
-        )
-
-        i1, i2, i3, i4, i5 = (
-            st.columns(5)
-        )
-
-        with i1:
-
-            st.metric(
-                "Average Score",
-                avg_score,
-            )
-
-        with i2:
-
-            st.metric(
-                "Critical",
-                int(
-                    priority_counts.get(
-                        "CRITICAL",
-                        0,
-                    )
-                ),
-            )
-
-        with i3:
-
-            st.metric(
-                "High",
-                int(
-                    priority_counts.get(
-                        "HIGH",
-                        0,
-                    )
-                ),
-            )
-
-        with i4:
-
-            st.metric(
-                "Medium",
-                int(
-                    priority_counts.get(
-                        "MEDIUM",
-                        0,
-                    )
-                ),
-            )
-
-        with i5:
-
-            st.metric(
-                "Low",
-                int(
-                    priority_counts.get(
-                        "LOW",
-                        0,
-                    )
-                ),
-            )
 
         st.dataframe(
             intelligence_df.sort_values(
@@ -886,7 +981,7 @@ if show_intelligence:
 
 
 # ============================================================
-# DAY 21 — CONTROLLED SCENARIO LAB
+# DAY 21 — SCENARIO LAB
 # ============================================================
 
 if show_day21:
@@ -905,12 +1000,7 @@ if show_day21:
 
     except Exception:
 
-        scenario_summary = {
-            "total": 0,
-            "benign": 0,
-            "suspicious": 0,
-            "malicious": 0,
-        }
+        scenario_summary = {}
 
     s1, s2, s3, s4 = (
         st.columns(4)
@@ -964,38 +1054,42 @@ if show_day21:
             SUSPICIOUS,
             MALICIOUS,
         ],
-        key="day21_class_filter",
+        key="day21_class",
     )
 
-    if scenario_class == "ALL":
+    try:
 
-        scenarios = (
-            get_scenario_catalog()
-        )
+        if scenario_class == "ALL":
 
-    else:
-
-        scenarios = (
-            get_scenarios(
-                scenario_class
+            scenarios = (
+                get_scenario_catalog()
             )
-        )
+
+        else:
+
+            scenarios = (
+                get_scenarios(
+                    scenario_class
+                )
+            )
+
+    except Exception:
+
+        scenarios = []
 
     if scenarios:
 
-        scenario_df = pd.DataFrame(
-            scenarios
-        )
-
         st.dataframe(
-            scenario_df,
+            pd.DataFrame(
+                scenarios
+            ),
             width="stretch",
             hide_index=True,
         )
 
 
 # ============================================================
-# DAY 22 — ATTACK RESEARCH LAB
+# DAY 22 — ATTACK RESEARCH
 # ============================================================
 
 if show_day22:
@@ -1003,26 +1097,21 @@ if show_day22:
     st.divider()
 
     st.header(
-        "⚔️ Day 22 — Controlled Attack Research Lab"
-    )
-
-    st.caption(
-        "Structured attack taxonomy used as the source "
-        "for reproducible research experiments."
+        "⚔️ Day 22 — Attack Scenario Research"
     )
 
     attack_summary = (
         get_attack_scenario_summary()
     )
 
-    a1, a2, a3, a4, a5 = (
-        st.columns(5)
+    a1, a2, a3, a4 = (
+        st.columns(4)
     )
 
     with a1:
 
         st.metric(
-            "Scenarios",
+            "Attack Scenarios",
             attack_summary.get(
                 "total",
                 0,
@@ -1059,16 +1148,6 @@ if show_day22:
             ),
         )
 
-    with a5:
-
-        st.metric(
-            "High",
-            attack_summary.get(
-                "high",
-                0,
-            ),
-        )
-
     attack_type = st.selectbox(
         "Attack Type",
         [
@@ -1077,19 +1156,7 @@ if show_day22:
         + list(
             ATTACK_SCENARIO_TYPES
         ),
-        key="day22_type",
-    )
-
-    attack_severity = st.selectbox(
-        "Severity",
-        [
-            "ALL",
-            "CRITICAL",
-            "HIGH",
-            "MEDIUM",
-            "LOW",
-        ],
-        key="day22_severity",
+        key="day22_attack_type",
     )
 
     if attack_type == "ALL":
@@ -1106,51 +1173,19 @@ if show_day22:
             )
         )
 
-    if attack_severity != "ALL":
-
-        attacks = [
-            attack
-            for attack
-            in attacks
-            if attack[
-                "severity"
-            ]
-            == attack_severity
-        ]
-
     if attacks:
 
-        attack_df = pd.DataFrame(
-            attacks
-        )
-
-        columns = [
-            "scenario_id",
-            "name",
-            "scenario_type",
-            "agent_id",
-            "severity",
-            "ground_truth",
-            "expected_signal",
-        ]
-
         st.dataframe(
-            attack_df[
-                [
-                    column
-                    for column
-                    in columns
-                    if column
-                    in attack_df.columns
-                ]
-            ],
+            pd.DataFrame(
+                attacks
+            ),
             width="stretch",
             hide_index=True,
         )
 
 
 # ============================================================
-# DAY 23 — EXPERIMENTAL DATASET RESEARCH LAB
+# DAY 23 — DATASET LAB
 # ============================================================
 
 if show_day23:
@@ -1158,47 +1193,12 @@ if show_day23:
     st.divider()
 
     st.header(
-        "🧬 Day 23 — Experimental Dataset Research Lab"
+        "🧬 Day 23 — Experimental Dataset Lab"
     )
 
     st.caption(
-        "Generate, validate, inspect and export reproducible "
-        "security experiments from the controlled attack catalog."
-    )
-
-    # --------------------------------------------------------
-    # RESEARCH OBJECTIVE
-    # --------------------------------------------------------
-
-    with st.expander(
-        "🔬 What is Day 23 doing?",
-        expanded=True,
-    ):
-
-        st.markdown(
-            """
-            Day 23 transforms the controlled security
-            scenarios into a machine-readable experimental
-            dataset.
-
-            Each generated event contains:
-
-            **Scenario → Agent → Task → Action → Resource →
-            Severity → Ground Truth → Risk → Decision →
-            Sequence Position → Timestamp → Experiment Seed**
-
-            The dataset is synthetic and reproducible.
-            It is intended for controlled research evaluation,
-            not as evidence of real-world attack prevalence.
-            """
-        )
-
-    # --------------------------------------------------------
-    # DATASET CONTROLS
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Experimental Configuration"
+        "Generate a reproducible dataset from the "
+        "controlled security scenario catalog."
     )
 
     d1, d2, d3 = (
@@ -1213,7 +1213,7 @@ if show_day23:
             max_value=100,
             value=5,
             step=1,
-            key="day23_events_per_scenario",
+            key="day23_events",
         )
 
     with d2:
@@ -1229,58 +1229,24 @@ if show_day23:
 
     with d3:
 
-        dataset_version_display = st.text_input(
+        st.metric(
             "Dataset Version",
-            value=DATASET_VERSION,
-            disabled=True,
-            key="day23_version",
+            DATASET_VERSION,
         )
 
-    # --------------------------------------------------------
-    # SOURCE SCENARIOS
-    # --------------------------------------------------------
-
-    source_scenarios = (
-        get_attack_scenarios()
-    )
-
-    st.metric(
-        "Source Attack Scenarios",
-        len(
-            source_scenarios
-        ),
-    )
-
-    # --------------------------------------------------------
-    # GENERATE DATASET
-    # --------------------------------------------------------
-
-    generate_col, validate_col = (
-        st.columns(2)
-    )
-
-    with generate_col:
-
-        generate_dataset = st.button(
-            "🧬 Generate Experimental Dataset",
-            type="primary",
-            use_container_width=True,
-            key="day23_generate",
-        )
-
-    with validate_col:
-
-        validate_existing = st.button(
-            "🔎 Validate Current Dataset",
-            use_container_width=True,
-            key="day23_validate",
-        )
-
-    if generate_dataset:
+    if st.button(
+        "🧬 Generate Dataset",
+        type="primary",
+        key="generate_day23_dataset",
+    ):
 
         try:
 
-            generated_dataset = (
+            source_scenarios = (
+                get_attack_scenarios()
+            )
+
+            dataset = (
                 generate_experimental_dataset(
                     scenarios=source_scenarios,
                     events_per_scenario=int(
@@ -1292,64 +1258,46 @@ if show_day23:
                 )
             )
 
-            st.session_state[
-                "day23_dataset"
-            ] = generated_dataset
-
-            st.session_state[
-                "day23_dataset_summary"
-            ] = summarize_dataset(
-                generated_dataset
+            st.session_state.day23_dataset = (
+                dataset
             )
 
-            st.session_state[
-                "day23_dataset_validation"
-            ] = validate_dataset(
-                generated_dataset
+            st.session_state.day23_summary = (
+                summarize_dataset(
+                    dataset
+                )
+            )
+
+            st.session_state.day23_validation = (
+                validate_dataset(
+                    dataset
+                )
             )
 
             st.success(
-                f"Generated {len(generated_dataset)} "
-                "experimental events successfully."
+                f"Generated {len(dataset)} events."
             )
 
         except Exception as error:
 
             st.error(
-                "Dataset generation failed: "
-                f"{error}"
+                f"Dataset generation failed: {error}"
             )
 
-    # --------------------------------------------------------
-    # CURRENT DATASET
-    # --------------------------------------------------------
-
-    current_dataset = (
-        st.session_state.get(
-            "day23_dataset"
-        )
+    dataset = (
+        st.session_state.day23_dataset
     )
 
-    if current_dataset:
+    if dataset:
 
-        dataset_summary = (
-            st.session_state.get(
-                "day23_dataset_summary",
-                {},
-            )
+        summary = (
+            st.session_state.day23_summary
+            or {}
         )
 
-        dataset_validation = (
-            st.session_state.get(
-                "day23_dataset_validation",
-                {},
-            )
-        )
-
-        st.divider()
-
-        st.subheader(
-            "Dataset Overview"
+        validation = (
+            st.session_state.day23_validation
+            or {}
         )
 
         m1, m2, m3, m4, m5 = (
@@ -1360,11 +1308,9 @@ if show_day23:
 
             st.metric(
                 "Events",
-                dataset_summary.get(
+                summary.get(
                     "total_events",
-                    len(
-                        current_dataset
-                    ),
+                    0,
                 ),
             )
 
@@ -1372,7 +1318,7 @@ if show_day23:
 
             st.metric(
                 "Benign",
-                dataset_summary.get(
+                summary.get(
                     "benign_events",
                     0,
                 ),
@@ -1382,7 +1328,7 @@ if show_day23:
 
             st.metric(
                 "Suspicious",
-                dataset_summary.get(
+                summary.get(
                     "suspicious_events",
                     0,
                 ),
@@ -1392,7 +1338,7 @@ if show_day23:
 
             st.metric(
                 "Malicious",
-                dataset_summary.get(
+                summary.get(
                     "malicious_events",
                     0,
                 ),
@@ -1401,98 +1347,219 @@ if show_day23:
         with m5:
 
             st.metric(
-                "Average Risk",
-                dataset_summary.get(
+                "Avg Risk",
+                summary.get(
                     "average_risk",
                     0,
                 ),
             )
 
-        # ----------------------------------------------------
-        # VALIDATION STATUS
-        # ----------------------------------------------------
+        if validation.get(
+            "valid",
+            False,
+        ):
 
-        st.subheader(
-            "Dataset Integrity"
+            st.success(
+                "Dataset integrity validation passed."
+            )
+
+        else:
+
+            st.error(
+                "Dataset integrity validation failed."
+            )
+
+        dataset_df = pd.DataFrame(
+            dataset
         )
 
-        validation_col1, validation_col2 = (
+        st.subheader(
+            "Dataset Preview"
+        )
+
+        st.dataframe(
+            dataset_df.head(25),
+            width="stretch",
+            hide_index=True,
+        )
+
+        csv_data = dataset_to_csv(
+            dataset
+        )
+
+        jsonl_data = dataset_to_jsonl(
+            dataset
+        )
+
+        dc1, dc2 = (
             st.columns(2)
         )
 
-        with validation_col1:
+        with dc1:
 
-            if dataset_validation.get(
-                "valid",
-                False,
-            ):
-
-                st.success(
-                    "✅ Dataset validation passed"
-                )
-
-            else:
-
-                st.error(
-                    "❌ Dataset validation failed"
-                )
-
-        with validation_col2:
-
-            st.write(
-                "**Rows:** "
-                f"{dataset_validation.get('total_rows', 0)}"
+            st.download_button(
+                "⬇️ Download CSV",
+                data=csv_data,
+                file_name=(
+                    "aegisguard_day23_dataset.csv"
+                ),
+                mime="text/csv",
+                use_container_width=True,
+                key="download_day23_csv",
             )
 
-            st.write(
-                "**Labels valid:** "
-                f"{dataset_validation.get('labels_valid', False)}"
+        with dc2:
+
+            st.download_button(
+                "⬇️ Download JSONL",
+                data=jsonl_data,
+                file_name=(
+                    "aegisguard_day23_dataset.jsonl"
+                ),
+                mime="application/json",
+                use_container_width=True,
+                key="download_day23_jsonl",
             )
 
-            st.write(
-                "**Risk scores valid:** "
-                f"{dataset_validation.get('risk_scores_valid', False)}"
-            )
 
-            st.write(
-                "**Decisions valid:** "
-                f"{dataset_validation.get('decisions_valid', False)}"
-            )
+# ============================================================
+# DAY 24 — QUANTITATIVE EVALUATION LAB
+# ============================================================
+
+if show_day24:
+
+    st.divider()
+
+    st.header(
+        "📈 Day 24 — Quantitative Detection Evaluation"
+    )
+
+    st.caption(
+        "Controlled evaluation of AegisGuard detection "
+        "performance against ground-truth experimental events."
+    )
+
+    # --------------------------------------------------------
+    # RESEARCH DEFINITION
+    # --------------------------------------------------------
+
+    with st.expander(
+        "🔬 Evaluation Methodology",
+        expanded=True,
+    ):
+
+        st.markdown(
+            """
+            ### Evaluation target
+
+            **Positive class:** `MALICIOUS`
+
+            **Negative class:** `BENIGN + SUSPICIOUS`
+
+            The evaluation compares AegisGuard's predicted
+            security signal against the known ground-truth
+            label in the synthetic experimental dataset.
+
+            ### Metrics
+
+            **Accuracy**
+
+            Overall proportion of correctly classified events.
+
+            **Precision**
+
+            Proportion of predicted malicious events that
+            were actually malicious.
+
+            **Recall / Detection Rate**
+
+            Proportion of actual malicious events detected.
+
+            **Specificity**
+
+            Proportion of non-malicious events correctly
+            identified as non-malicious.
+
+            **F1 Score**
+
+            Harmonic mean of precision and recall.
+
+            **False Positive Rate**
+
+            Proportion of non-malicious events incorrectly
+            classified as malicious.
+
+            **False Negative Rate**
+
+            Proportion of malicious events missed by the
+            detector.
+            """
+        )
+
+    # --------------------------------------------------------
+    # DATASET CHECK
+    # --------------------------------------------------------
+
+    evaluation_dataset = (
+        st.session_state.day23_dataset
+    )
+
+    if not evaluation_dataset:
+
+        st.warning(
+            "No Day 23 dataset is currently loaded."
+        )
+
+        st.info(
+            "Generate the Day 23 experimental dataset "
+            "above before running the Day 24 evaluation."
+        )
+
+    else:
+
+        evaluation_df = pd.DataFrame(
+            evaluation_dataset
+        )
+
+        st.success(
+            f"Evaluation dataset loaded: "
+            f"{len(evaluation_dataset)} events"
+        )
 
         # ----------------------------------------------------
-        # LABEL DISTRIBUTION
+        # CLASS DISTRIBUTION
         # ----------------------------------------------------
+
+        distribution = (
+            get_label_distribution(
+                evaluation_dataset
+            )
+        )
 
         st.subheader(
-            "Ground-Truth Distribution"
+            "Ground-Truth Class Distribution"
         )
 
-        label_distribution = (
-            get_label_distribution(
-                current_dataset
-            )
-        )
-
-        label_df = pd.DataFrame(
+        class_df = pd.DataFrame(
             {
-                "Ground Truth": [
+                "Class": [
                     "BENIGN",
                     "SUSPICIOUS",
                     "MALICIOUS",
                 ],
 
                 "Count": [
-                    label_distribution.get(
+                    distribution.get(
                         "BENIGN",
                         0,
                     ),
 
-                    label_distribution.get(
+                    distribution.get(
                         "SUSPICIOUS",
                         0,
                     ),
 
-                    label_distribution.get(
+                    distribution.get(
                         "MALICIOUS",
                         0,
                     ),
@@ -1500,301 +1567,606 @@ if show_day23:
             }
         )
 
-        chart_col, distribution_col = (
+        cc1, cc2 = (
             st.columns(2)
         )
 
-        with chart_col:
+        with cc1:
 
             st.bar_chart(
-                label_df.set_index(
-                    "Ground Truth"
+                class_df.set_index(
+                    "Class"
                 ),
                 width="stretch",
             )
 
-        with distribution_col:
+        with cc2:
 
             st.dataframe(
-                label_df,
+                class_df,
                 width="stretch",
                 hide_index=True,
             )
 
-            total_labels = sum(
-                label_distribution.values()
-            )
-
-            if total_labels:
-
-                benign_ratio = (
-                    label_distribution[
-                        "BENIGN"
-                    ]
-                    / total_labels
-                    * 100
-                )
-
-                suspicious_ratio = (
-                    label_distribution[
-                        "SUSPICIOUS"
-                    ]
-                    / total_labels
-                    * 100
-                )
-
-                malicious_ratio = (
-                    label_distribution[
-                        "MALICIOUS"
-                    ]
-                    / total_labels
-                    * 100
-                )
-
-                st.write(
-                    f"Benign: **{benign_ratio:.1f}%**"
-                )
-
-                st.write(
-                    f"Suspicious: **{suspicious_ratio:.1f}%**"
-                )
-
-                st.write(
-                    f"Malicious: **{malicious_ratio:.1f}%**"
-                )
-
         # ----------------------------------------------------
-        # DATASET PREVIEW
+        # RESEARCH WARNING
         # ----------------------------------------------------
 
-        st.subheader(
-            "Experimental Dataset Preview"
+        total_classes = sum(
+            distribution.values()
         )
 
-        dataset_df = pd.DataFrame(
-            current_dataset
-        )
+        if total_classes:
 
-        preview_count = st.slider(
-            "Preview Rows",
-            min_value=5,
-            max_value=min(
-                100,
-                len(
-                    dataset_df
-                ),
-            ),
-            value=min(
-                20,
-                len(
-                    dataset_df
-                ),
-            ),
-            key="day23_preview_rows",
-        )
-
-        st.dataframe(
-            dataset_df.head(
-                preview_count
-            ),
-            width="stretch",
-            hide_index=True,
-        )
-
-        # ----------------------------------------------------
-        # DATASET FILTER
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Research Dataset Explorer"
-        )
-
-        filter_col1, filter_col2, filter_col3 = (
-            st.columns(3)
-        )
-
-        with filter_col1:
-
-            selected_label = st.selectbox(
-                "Ground Truth",
-                [
-                    "ALL",
-                    "BENIGN",
-                    "SUSPICIOUS",
+            malicious_ratio = (
+                distribution.get(
                     "MALICIOUS",
-                ],
-                key="day23_label_filter",
+                    0,
+                )
+                / total_classes
             )
 
-        with filter_col2:
-
-            selected_decision = st.selectbox(
-                "Decision",
-                [
-                    "ALL",
-                    "ALLOW",
-                    "DENY",
-                ],
-                key="day23_decision_filter",
+            suspicious_ratio = (
+                distribution.get(
+                    "SUSPICIOUS",
+                    0,
+                )
+                / total_classes
             )
 
-        with filter_col3:
+            if (
+                malicious_ratio > 0.70
+                or suspicious_ratio == 0
+            ):
 
-            min_risk = st.slider(
-                "Minimum Risk",
-                min_value=0,
-                max_value=100,
-                value=0,
-                step=5,
-                key="day23_min_risk",
-            )
-
-        filtered_df = dataset_df.copy()
-
-        if selected_label != "ALL":
-
-            filtered_df = filtered_df[
-                filtered_df[
-                    "ground_truth"
-                ]
-                == selected_label
-            ]
-
-        if selected_decision != "ALL":
-
-            filtered_df = filtered_df[
-                filtered_df[
-                    "decision"
-                ]
-                == selected_decision
-            ]
-
-        if "risk_score" in filtered_df.columns:
-
-            filtered_df = filtered_df[
-                filtered_df[
-                    "risk_score"
-                ]
-                >= min_risk
-            ]
-
-        st.write(
-            f"Matching events: **{len(filtered_df)}**"
-        )
-
-        st.dataframe(
-            filtered_df,
-            width="stretch",
-            hide_index=True,
-        )
+                st.warning(
+                    "Dataset imbalance detected. "
+                    "Current results should be interpreted "
+                    "as controlled prototype measurements, "
+                    "not generalized production performance."
+                )
 
         # ----------------------------------------------------
-        # EXPORT
+        # EVALUATION CONTROLS
         # ----------------------------------------------------
 
         st.subheader(
-            "Research Dataset Export"
+            "Evaluation Configuration"
         )
 
-        export_col1, export_col2 = (
+        e1, e2 = (
             st.columns(2)
         )
 
-        with export_col1:
+        with e1:
 
-            csv_data = dataset_to_csv(
-                current_dataset
+            prediction_mode = st.selectbox(
+                "Prediction Signal",
+                [
+                    "Risk Threshold",
+                    "Authorization Decision",
+                    "Risk OR Authorization",
+                ],
+                key="day24_prediction_mode",
             )
 
-            st.download_button(
-                "⬇️ Download CSV Dataset",
-                data=csv_data,
-                file_name=(
-                    "aegisguard_day23_experimental_dataset.csv"
-                ),
-                mime="text/csv",
-                use_container_width=True,
-                key="day23_csv_download",
-            )
+        with e2:
 
-        with export_col2:
-
-            jsonl_data = dataset_to_jsonl(
-                current_dataset
-            )
-
-            st.download_button(
-                "⬇️ Download JSONL Dataset",
-                data=jsonl_data,
-                file_name=(
-                    "aegisguard_day23_experimental_dataset.jsonl"
-                ),
-                mime="application/json",
-                use_container_width=True,
-                key="day23_jsonl_download",
+            risk_threshold = st.slider(
+                "Risk Detection Threshold",
+                min_value=0,
+                max_value=100,
+                value=70,
+                step=5,
+                key="day24_risk_threshold",
             )
 
         # ----------------------------------------------------
-        # REPRODUCIBILITY
+        # CALCULATE METRICS
+        # ----------------------------------------------------
+
+        metrics = evaluate_dataset(
+            evaluation_dataset,
+            risk_threshold,
+            prediction_mode,
+        )
+
+        st.subheader(
+            "Detection Performance"
+        )
+
+        p1, p2, p3, p4, p5 = (
+            st.columns(5)
+        )
+
+        with p1:
+
+            st.metric(
+                "Accuracy",
+                f"{metrics['accuracy'] * 100:.2f}%",
+            )
+
+        with p2:
+
+            st.metric(
+                "Precision",
+                f"{metrics['precision'] * 100:.2f}%",
+            )
+
+        with p3:
+
+            st.metric(
+                "Recall",
+                f"{metrics['recall'] * 100:.2f}%",
+            )
+
+        with p4:
+
+            st.metric(
+                "F1 Score",
+                f"{metrics['f1_score'] * 100:.2f}%",
+            )
+
+        with p5:
+
+            st.metric(
+                "Specificity",
+                f"{metrics['specificity'] * 100:.2f}%",
+            )
+
+        # ----------------------------------------------------
+        # ERROR METRICS
+        # ----------------------------------------------------
+
+        f1, f2, f3 = (
+            st.columns(3)
+        )
+
+        with f1:
+
+            st.metric(
+                "False Positive Rate",
+                f"{metrics['false_positive_rate'] * 100:.2f}%",
+            )
+
+        with f2:
+
+            st.metric(
+                "False Negative Rate",
+                f"{metrics['false_negative_rate'] * 100:.2f}%",
+            )
+
+        with f3:
+
+            st.metric(
+                "Detection Rate",
+                f"{metrics['recall'] * 100:.2f}%",
+            )
+
+        # ----------------------------------------------------
+        # CONFUSION MATRIX
         # ----------------------------------------------------
 
         st.subheader(
-            "🔁 Reproducibility Metadata"
+            "Confusion Matrix"
         )
 
-        reproducibility_df = pd.DataFrame(
+        cm_df = pd.DataFrame(
+            [
+                [
+                    metrics["true_negative"],
+                    metrics["false_positive"],
+                ],
+
+                [
+                    metrics["false_negative"],
+                    metrics["true_positive"],
+                ],
+            ],
+
+            index=[
+                "Actual Non-Malicious",
+                "Actual Malicious",
+            ],
+
+            columns=[
+                "Predicted Non-Malicious",
+                "Predicted Malicious",
+            ],
+        )
+
+        cm1, cm2 = (
+            st.columns(2)
+        )
+
+        with cm1:
+
+            st.dataframe(
+                cm_df,
+                width="stretch",
+            )
+
+        with cm2:
+
+            st.metric(
+                "True Positives",
+                metrics["true_positive"],
+            )
+
+            st.metric(
+                "True Negatives",
+                metrics["true_negative"],
+            )
+
+            st.metric(
+                "False Positives",
+                metrics["false_positive"],
+            )
+
+            st.metric(
+                "False Negatives",
+                metrics["false_negative"],
+            )
+
+        # ----------------------------------------------------
+        # THRESHOLD ANALYSIS
+        # ----------------------------------------------------
+
+        st.divider()
+
+        st.subheader(
+            "📐 Risk Threshold Sensitivity Analysis"
+        )
+
+        st.caption(
+            "Measure how detection performance changes "
+            "as the risk threshold changes."
+        )
+
+        thresholds = list(
+            range(
+                0,
+                101,
+                5,
+            )
+        )
+
+        threshold_df = (
+            build_threshold_evaluation(
+                evaluation_dataset,
+                thresholds,
+            )
+        )
+
+        st.dataframe(
+            threshold_df,
+            width="stretch",
+            hide_index=True,
+        )
+
+        threshold_chart_df = (
+            threshold_df[
+                [
+                    "Threshold",
+                    "Precision",
+                    "Recall",
+                    "F1",
+                    "Specificity",
+                ]
+            ]
+            .set_index(
+                "Threshold"
+            )
+        )
+
+        st.line_chart(
+            threshold_chart_df,
+            width="stretch",
+        )
+
+        # ----------------------------------------------------
+        # BEST F1 THRESHOLD
+        # ----------------------------------------------------
+
+        if not threshold_df.empty:
+
+            best_row = (
+                threshold_df.sort_values(
+                    "F1",
+                    ascending=False,
+                )
+                .iloc[0]
+            )
+
+            st.subheader(
+                "Recommended Experimental Threshold"
+            )
+
+            b1, b2, b3 = (
+                st.columns(3)
+            )
+
+            with b1:
+
+                st.metric(
+                    "Best F1 Threshold",
+                    int(
+                        best_row[
+                            "Threshold"
+                        ]
+                    ),
+                )
+
+            with b2:
+
+                st.metric(
+                    "Best F1",
+                    f"{best_row['F1'] * 100:.2f}%",
+                )
+
+            with b3:
+
+                st.metric(
+                    "Recall at Best F1",
+                    f"{best_row['Recall'] * 100:.2f}%",
+                )
+
+            st.info(
+                "This threshold is selected only by maximum "
+                "F1 on the current synthetic dataset. "
+                "It must not be treated as a production "
+                "security threshold without independent "
+                "validation data."
+            )
+
+        # ----------------------------------------------------
+        # EVENT-LEVEL PREDICTIONS
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Event-Level Evaluation"
+        )
+
+        evaluated_rows = []
+
+        for event in evaluation_dataset:
+
+            risk_score = safe_float(
+                event.get(
+                    "risk_score",
+                    0,
+                )
+            )
+
+            decision = str(
+                event.get(
+                    "decision",
+                    "",
+                )
+            ).upper()
+
+            ground_truth = str(
+                event.get(
+                    "ground_truth",
+                    "",
+                )
+            ).upper()
+
+            if prediction_mode == "Risk Threshold":
+
+                predicted = (
+                    risk_score
+                    >= risk_threshold
+                )
+
+            elif prediction_mode == "Authorization Decision":
+
+                predicted = (
+                    decision == "DENY"
+                )
+
+            else:
+
+                predicted = (
+                    risk_score
+                    >= risk_threshold
+                    or decision == "DENY"
+                )
+
+            actual = (
+                ground_truth == "MALICIOUS"
+            )
+
+            if actual and predicted:
+
+                classification = "TP"
+
+            elif actual and not predicted:
+
+                classification = "FN"
+
+            elif not actual and predicted:
+
+                classification = "FP"
+
+            else:
+
+                classification = "TN"
+
+            evaluated_rows.append(
+                {
+                    "event_id":
+                        event.get(
+                            "event_id",
+                            "",
+                        ),
+
+                    "scenario_id":
+                        event.get(
+                            "scenario_id",
+                            "",
+                        ),
+
+                    "ground_truth":
+                        ground_truth,
+
+                    "risk_score":
+                        risk_score,
+
+                    "decision":
+                        decision,
+
+                    "predicted_malicious":
+                        predicted,
+
+                    "classification":
+                        classification,
+                }
+            )
+
+        evaluated_df = pd.DataFrame(
+            evaluated_rows
+        )
+
+        classification_filter = st.selectbox(
+            "Evaluation Result",
+            [
+                "ALL",
+                "TP",
+                "TN",
+                "FP",
+                "FN",
+            ],
+            key="day24_result_filter",
+        )
+
+        display_df = (
+            evaluated_df
+        )
+
+        if classification_filter != "ALL":
+
+            display_df = evaluated_df[
+                evaluated_df[
+                    "classification"
+                ]
+                == classification_filter
+            ]
+
+        st.write(
+            f"Matching events: "
+            f"**{len(display_df)}**"
+        )
+
+        st.dataframe(
+            display_df,
+            width="stretch",
+            hide_index=True,
+        )
+
+        # ----------------------------------------------------
+        # EXPORT EVALUATION RESULTS
+        # ----------------------------------------------------
+
+        evaluation_csv = (
+            evaluated_df.to_csv(
+                index=False
+            )
+        )
+
+        st.download_button(
+            "⬇️ Download Evaluation Results",
+            data=evaluation_csv,
+            file_name=(
+                "aegisguard_day24_evaluation_results.csv"
+            ),
+            mime="text/csv",
+            use_container_width=True,
+            key="day24_download",
+        )
+
+        # ----------------------------------------------------
+        # RESEARCH METADATA
+        # ----------------------------------------------------
+
+        st.subheader(
+            "🔬 Experimental Metadata"
+        )
+
+        metadata_df = pd.DataFrame(
             {
                 "Parameter": [
                     "Dataset Version",
-                    "Experiment Seed",
-                    "Events per Scenario",
-                    "Scenario Count",
-                    "Total Events",
+                    "Evaluation Target",
+                    "Prediction Mode",
+                    "Risk Threshold",
+                    "Dataset Size",
+                    "Positive Class",
+                    "Negative Class",
                 ],
 
                 "Value": [
                     DATASET_VERSION,
-                    experiment_seed,
-                    events_per_scenario,
+                    "Malicious Detection",
+                    prediction_mode,
+                    risk_threshold,
                     len(
-                        source_scenarios
+                        evaluation_dataset
                     ),
-                    len(
-                        current_dataset
-                    ),
+                    "MALICIOUS",
+                    "BENIGN + SUSPICIOUS",
                 ],
             }
         )
 
         st.dataframe(
-            reproducibility_df,
+            metadata_df,
             width="stretch",
             hide_index=True,
         )
 
-        st.info(
-            "Using the same scenario catalog, events-per-scenario "
-            "value and experiment seed should reproduce the "
-            "same synthetic dataset."
-        )
-
         # ----------------------------------------------------
-        # RESEARCH LIMITATION
+        # RESEARCH INTERPRETATION
         # ----------------------------------------------------
 
-        st.warning(
-            "Research limitation: this dataset is synthetic "
-            "and controlled. It should not be presented as "
-            "evidence of real-world attack prevalence or "
-            "production detection performance."
+        st.subheader(
+            "🧪 Interpretation"
         )
 
-    else:
+        if metrics["false_positive_rate"] > 0:
+
+            st.warning(
+                "False positives are present. This means "
+                "the current detector is classifying at least "
+                "some non-malicious events as malicious."
+            )
+
+        else:
+
+            st.success(
+                "No false positives were observed in this "
+                "controlled experiment."
+            )
+
+        if metrics["false_negative_rate"] > 0:
+
+            st.warning(
+                "False negatives are present. Some malicious "
+                "events were not detected by the current "
+                "prediction rule."
+            )
+
+        else:
+
+            st.success(
+                "No false negatives were observed in this "
+                "controlled experiment."
+            )
 
         st.info(
-            "No experimental dataset has been generated yet. "
-            "Configure the experiment above and click "
-            "'Generate Experimental Dataset'."
+            "These measurements describe this experimental "
+            "dataset only. They are not evidence of real-world "
+            "generalization."
         )
 
 
@@ -1810,11 +2182,11 @@ if show_anomalies:
         "🚨 Behavioral Anomaly Detection"
     )
 
-    a1, a2, a3, a4 = (
+    ac1, ac2, ac3, ac4 = (
         st.columns(4)
     )
 
-    with a1:
+    with ac1:
 
         st.metric(
             "Agents Analyzed",
@@ -1824,7 +2196,7 @@ if show_anomalies:
             ),
         )
 
-    with a2:
+    with ac2:
 
         st.metric(
             "High Anomaly",
@@ -1834,7 +2206,7 @@ if show_anomalies:
             ),
         )
 
-    with a3:
+    with ac3:
 
         st.metric(
             "Medium Anomaly",
@@ -1844,7 +2216,7 @@ if show_anomalies:
             ),
         )
 
-    with a4:
+    with ac4:
 
         st.metric(
             "Normal",
@@ -1856,50 +2228,20 @@ if show_anomalies:
 
     if anomaly_results:
 
-        anomaly_rows = []
-
-        for item in anomaly_results:
-
-            anomaly_rows.append(
-                {
-                    "Agent":
-                        item.get(
-                            "agent_id",
-                            "",
-                        ),
-
-                    "Anomaly Score":
-                        safe_float(
-                            item.get(
-                                "anomaly_score",
-                                0,
-                            )
-                        ),
-
-                    "Severity":
-                        item.get(
-                            "anomaly_severity",
-                            "NORMAL",
-                        ),
-
-                    "Average Risk":
-                        safe_float(
-                            item.get(
-                                "average_risk",
-                                0,
-                            )
-                        ),
-                }
-            )
-
         anomaly_df = pd.DataFrame(
-            anomaly_rows
+            anomaly_results
         )
 
         st.dataframe(
             anomaly_df,
             width="stretch",
             hide_index=True,
+        )
+
+    else:
+
+        st.info(
+            "No anomaly records available."
         )
 
 
@@ -1919,13 +2261,6 @@ if show_features:
 
         behavior_df = pd.DataFrame(
             behavioral_features
-        )
-
-        st.metric(
-            "Agents Profiled",
-            len(
-                behavior_df
-            ),
         )
 
         st.dataframe(
@@ -1960,9 +2295,9 @@ if show_features:
         if available_features:
 
             selected_feature = st.selectbox(
-                "Explore Feature",
+                "Feature",
                 available_features,
-                key="day18_feature",
+                key="feature_selector",
             )
 
             if (
@@ -2015,11 +2350,11 @@ if show_investigation:
             "actions": [],
         }
 
-    inv1, inv2, inv3 = (
+    ic1, ic2, ic3 = (
         st.columns(3)
     )
 
-    with inv1:
+    with ic1:
 
         selected_agent = st.selectbox(
             "Agent",
@@ -2033,7 +2368,7 @@ if show_investigation:
             key="investigation_agent",
         )
 
-    with inv2:
+    with ic2:
 
         selected_action = st.selectbox(
             "Action",
@@ -2047,7 +2382,7 @@ if show_investigation:
             key="investigation_action",
         )
 
-    with inv3:
+    with ic3:
 
         selected_decision = st.selectbox(
             "Decision",
@@ -2060,9 +2395,9 @@ if show_investigation:
         )
 
     if st.button(
-        "🔍 Investigate Events",
+        "🔍 Investigate",
         type="primary",
-        key="investigate_events",
+        key="investigate",
     ):
 
         try:
@@ -2094,28 +2429,25 @@ if show_investigation:
                 )
             )
 
-            st.session_state[
-                "investigation_results"
-            ] = results
+            st.session_state.investigation_results = (
+                results
+            )
 
-            st.session_state[
-                "investigation_executed"
-            ] = True
+            st.session_state.investigation_executed = (
+                True
+            )
 
         except Exception as error:
 
             st.error(
-                "Investigation failed: "
-                f"{error}"
+                f"Investigation failed: {error}"
             )
 
-    if st.session_state[
-        "investigation_executed"
-    ]:
+    if st.session_state.investigation_executed:
 
-        results = st.session_state[
-            "investigation_results"
-        ]
+        results = (
+            st.session_state.investigation_results
+        )
 
         if results:
 
@@ -2125,9 +2457,7 @@ if show_investigation:
 
             st.metric(
                 "Matching Events",
-                len(
-                    results
-                ),
+                len(results),
             )
 
             st.dataframe(
@@ -2168,6 +2498,7 @@ if show_agents:
         )
 
         required_columns = {
+            "agent_id",
             "total_requests",
             "denied_requests",
         }
@@ -2176,11 +2507,7 @@ if show_agents:
             agent_df.columns
         ):
 
-            st.subheader(
-                "Request Activity"
-            )
-
-            st.bar_chart(
+            activity_df = (
                 agent_df[
                     [
                         "agent_id",
@@ -2190,7 +2517,11 @@ if show_agents:
                 ]
                 .set_index(
                     "agent_id"
-                ),
+                )
+            )
+
+            st.bar_chart(
+                activity_df,
                 width="stretch",
             )
 
@@ -2210,7 +2541,7 @@ if show_high_risk:
     st.divider()
 
     st.header(
-        "🔥 High-Risk Security Events"
+        "🔥 High-Risk Events"
     )
 
     if high_risk_events:
@@ -2239,14 +2570,14 @@ if show_high_risk:
 st.divider()
 
 st.header(
-    "🏗️ AegisGuard Research Architecture"
+    "🏗️ AegisGuard Research Pipeline"
 )
 
-architecture1, architecture2 = (
+arch1, arch2 = (
     st.columns(2)
 )
 
-with architecture1:
+with arch1:
 
     st.markdown(
         """
@@ -2256,11 +2587,11 @@ with architecture1:
 
         ↓
 
-        Identity / Authorization
+        Identity
 
         ↓
 
-        Policy Evaluation
+        Authorization
 
         ↓
 
@@ -2276,13 +2607,13 @@ with architecture1:
         """
     )
 
-with architecture2:
+with arch2:
 
     st.markdown(
         """
-        ### Research Intelligence Pipeline
+        ### Research Evaluation Plane
 
-        Security Telemetry
+        Telemetry
 
         ↓
 
@@ -2291,10 +2622,6 @@ with architecture2:
         ↓
 
         Anomaly Detection
-
-        ↓
-
-        Integrated Intelligence
 
         ↓
 
@@ -2310,48 +2637,56 @@ with architecture2:
 
         ↓
 
-        Quantitative Evaluation
+        Quantitative Metrics
+
+        ↓
+
+        Threshold Analysis
         """
     )
 
 
 # ============================================================
-# DAY 23 MILESTONE
+# DAY 24 RESEARCH MILESTONE
 # ============================================================
 
 st.divider()
 
 st.header(
-    "🔬 Day 23 Research Milestone"
+    "🔬 Day 24 Research Milestone"
 )
 
 st.markdown(
     """
-    ### Reproducible Experimental Dataset
+    ### Quantitative Detection Evaluation
 
-    AegisGuard can now transform controlled security
-    scenarios into structured experimental events.
+    AegisGuard now supports controlled measurement of
+    detection performance against known ground-truth events.
 
-    Each event records:
+    The evaluation layer measures:
 
-    **Scenario → Agent → Action → Resource → Severity →
-    Ground Truth → Risk → Decision → Sequence →
-    Timestamp → Experiment Seed**
+    - Accuracy
+    - Precision
+    - Recall
+    - F1-score
+    - Specificity
+    - False-positive rate
+    - False-negative rate
+    - Confusion matrix
+    - Risk-threshold sensitivity
+    - Event-level classification
+    - Reproducibility metadata
 
-    This establishes the data foundation required for
-    quantitative evaluation in the next research phase.
-
-    The generated dataset supports:
-
-    - Reproducible experiments
-    - Ground-truth classification
-    - Risk analysis
-    - Authorization outcome analysis
-    - Behavioral evaluation
-    - CSV export
-    - JSONL export
-    - Dataset integrity validation
+    This establishes the foundation for the next stage:
+    **baseline comparison and statistically defensible
+    experiments.**
     """
+)
+
+st.warning(
+    "Current measurements are controlled prototype "
+    "experiments using synthetic data. They must not be "
+    "reported as real-world production performance."
 )
 
 st.caption(
@@ -2360,5 +2695,5 @@ st.caption(
 )
 
 st.caption(
-    "Day 23 • Experimental Dataset Generation"
+    "Day 24 • Quantitative Detection Evaluation"
 )

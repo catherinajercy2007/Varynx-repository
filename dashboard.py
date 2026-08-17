@@ -3,7 +3,7 @@ import pandas as pd
 
 
 # ============================================================
-# AEGISGUARD — CORE SECURITY ANALYTICS
+# CORE SECURITY ANALYTICS
 # ============================================================
 
 from app.analytics import (
@@ -16,7 +16,7 @@ from app.analytics import (
 
 
 # ============================================================
-# AEGISGUARD — BEHAVIOR ANALYTICS
+# BEHAVIOR ANALYTICS
 # ============================================================
 
 from app.behavior import (
@@ -26,7 +26,7 @@ from app.behavior import (
 
 
 # ============================================================
-# AEGISGUARD — INVESTIGATION ENGINE
+# INVESTIGATION ENGINE
 # ============================================================
 
 from app.investigation import (
@@ -37,7 +37,7 @@ from app.investigation import (
 
 
 # ============================================================
-# AEGISGUARD — BEHAVIORAL FEATURES
+# BEHAVIORAL FEATURES
 # ============================================================
 
 from app.features import (
@@ -47,7 +47,7 @@ from app.features import (
 
 
 # ============================================================
-# AEGISGUARD — ANOMALY DETECTION
+# ANOMALY DETECTION
 # ============================================================
 
 from app.anomaly import (
@@ -57,7 +57,7 @@ from app.anomaly import (
 
 
 # ============================================================
-# AEGISGUARD — DAY 21 SCENARIO FRAMEWORK
+# DAY 21 — CONTROLLED SCENARIOS
 # ============================================================
 
 from app.scenarios import (
@@ -68,6 +68,21 @@ from app.scenarios import (
     get_scenarios,
     get_scenario_summary,
     sample_scenarios,
+)
+
+
+# ============================================================
+# DAY 22 — ATTACK SCENARIOS
+# ============================================================
+
+from app.attack_scenarios import (
+    ATTACK_SCENARIO_TYPES,
+    get_attack_scenarios,
+    get_attack_scenario,
+    get_attack_scenarios_by_type,
+    get_attack_scenarios_by_severity,
+    get_attack_scenario_summary,
+    sample_attack_scenarios,
 )
 
 
@@ -87,14 +102,17 @@ st.set_page_config(
 # SESSION STATE
 # ============================================================
 
-if "investigation_results" not in st.session_state:
-    st.session_state.investigation_results = []
+DEFAULT_STATE = {
+    "investigation_results": [],
+    "investigation_executed": False,
+    "day21_sampled_scenarios": None,
+    "day22_attack_experiment": None,
+}
 
-if "investigation_executed" not in st.session_state:
-    st.session_state.investigation_executed = False
+for key, value in DEFAULT_STATE.items():
 
-if "day21_sampled_scenarios" not in st.session_state:
-    st.session_state.day21_sampled_scenarios = None
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # ============================================================
@@ -102,15 +120,19 @@ if "day21_sampled_scenarios" not in st.session_state:
 # ============================================================
 
 def safe_float(value, default=0.0):
+
     try:
         return float(value)
+
     except (TypeError, ValueError):
         return default
 
 
 def safe_int(value, default=0):
+
     try:
         return int(value)
+
     except (TypeError, ValueError):
         return default
 
@@ -120,6 +142,7 @@ def clamp(
     minimum=0.0,
     maximum=100.0,
 ):
+
     return max(
         minimum,
         min(
@@ -134,10 +157,6 @@ def calculate_agent_intelligence(
     anomaly_lookup,
     suspicious_lookup,
 ):
-    """
-    Build an explainable agent-level security
-    intelligence record from existing signals.
-    """
 
     agent_id = str(
         agent.get(
@@ -167,13 +186,11 @@ def calculate_agent_intelligence(
         )
     )
 
-    if total_requests > 0:
-        denial_rate = (
-            denied_requests
-            / total_requests
-        )
-    else:
-        denial_rate = 0.0
+    denial_rate = (
+        denied_requests / total_requests
+        if total_requests > 0
+        else 0
+    )
 
     anomaly = anomaly_lookup.get(
         agent_id,
@@ -194,39 +211,39 @@ def calculate_agent_intelligence(
         )
     ).upper()
 
-    anomaly_signal = clamp(
-        anomaly_score / 3.0 * 100.0
-    )
-
-    denial_signal = clamp(
-        denial_rate * 100.0
-    )
-
     risk_signal = clamp(
         maximum_risk
     )
 
+    denial_signal = clamp(
+        denial_rate * 100
+    )
+
+    anomaly_signal = clamp(
+        anomaly_score / 3 * 100
+    )
+
     suspicious_signal = (
-        100.0
+        100
         if agent_id in suspicious_lookup
-        else 0.0
+        else 0
     )
 
     severity_bonus = {
-        "NORMAL": 0.0,
-        "LOW": 5.0,
-        "MEDIUM": 15.0,
-        "HIGH": 25.0,
+        "NORMAL": 0,
+        "LOW": 5,
+        "MEDIUM": 15,
+        "HIGH": 25,
     }.get(
         anomaly_severity,
-        0.0,
+        0,
     )
 
     intelligence_score = (
-        (risk_signal * 0.35)
-        + (denial_signal * 0.25)
-        + (anomaly_signal * 0.25)
-        + (suspicious_signal * 0.15)
+        risk_signal * 0.35
+        + denial_signal * 0.25
+        + anomaly_signal * 0.25
+        + suspicious_signal * 0.15
         + severity_bonus
     )
 
@@ -236,29 +253,29 @@ def calculate_agent_intelligence(
 
     if intelligence_score >= 80:
         priority = "CRITICAL"
+
     elif intelligence_score >= 60:
         priority = "HIGH"
+
     elif intelligence_score >= 35:
         priority = "MEDIUM"
+
     else:
         priority = "LOW"
 
-    if priority == "CRITICAL":
-        recommended_action = (
-            "Immediate investigation and containment review"
-        )
-    elif priority == "HIGH":
-        recommended_action = (
-            "Prioritize analyst investigation"
-        )
-    elif priority == "MEDIUM":
-        recommended_action = (
-            "Increase monitoring and review behavior"
-        )
-    else:
-        recommended_action = (
-            "Continue normal monitoring"
-        )
+    recommendations = {
+        "CRITICAL":
+            "Immediate investigation and containment review",
+
+        "HIGH":
+            "Prioritize analyst investigation",
+
+        "MEDIUM":
+            "Increase monitoring and review behavior",
+
+        "LOW":
+            "Continue normal monitoring",
+    }
 
     return {
         "agent_id": agent_id,
@@ -282,7 +299,8 @@ def calculate_agent_intelligence(
             2,
         ),
         "priority": priority,
-        "recommended_action": recommended_action,
+        "recommended_action":
+            recommendations[priority],
     }
 
 
@@ -333,8 +351,13 @@ with st.sidebar:
         value=True,
     )
 
-    show_scenarios = st.checkbox(
+    show_day21 = st.checkbox(
         "Day 21 Scenario Lab",
+        value=True,
+    )
+
+    show_day22 = st.checkbox(
+        "Day 22 Attack Research",
         value=True,
     )
 
@@ -403,6 +426,11 @@ with st.sidebar:
 
         **Day 21**
         Controlled Scenarios
+
+        ↓
+
+        **Day 22**
+        Attack Scenario Research
         """
     )
 
@@ -413,12 +441,12 @@ with st.sidebar:
     )
 
     st.caption(
-        "Day 21 • Experimental Security Scenarios"
+        "Day 22 • Attack Scenario Framework"
     )
 
 
 # ============================================================
-# LOAD CORE SECURITY DATA
+# LOAD CORE DATA
 # ============================================================
 
 try:
@@ -440,7 +468,7 @@ try:
 except Exception as error:
 
     st.error(
-        "Unable to load core security data: "
+        "Unable to load security data: "
         f"{error}"
     )
 
@@ -448,7 +476,7 @@ except Exception as error:
 
 
 # ============================================================
-# LOAD BEHAVIORAL FEATURES
+# BEHAVIORAL FEATURES
 # ============================================================
 
 try:
@@ -457,18 +485,13 @@ try:
         get_behavioral_features()
     )
 
-except Exception as error:
+except Exception:
 
     behavioral_features = []
 
-    st.warning(
-        "Behavioral feature layer unavailable: "
-        f"{error}"
-    )
-
 
 # ============================================================
-# LOAD ANOMALY DATA
+# ANOMALIES
 # ============================================================
 
 try:
@@ -481,7 +504,7 @@ try:
         get_anomaly_summary()
     )
 
-except Exception as error:
+except Exception:
 
     anomaly_results = []
 
@@ -493,14 +516,9 @@ except Exception as error:
         "normal_agents": 0,
     }
 
-    st.warning(
-        "Anomaly detection layer unavailable: "
-        f"{error}"
-    )
-
 
 # ============================================================
-# BUILD LOOKUPS
+# LOOKUPS
 # ============================================================
 
 anomaly_lookup = {
@@ -510,7 +528,9 @@ anomaly_lookup = {
             "",
         )
     ): item
-    for item in anomaly_results
+
+    for item
+    in anomaly_results
 }
 
 suspicious_lookup = {
@@ -520,12 +540,14 @@ suspicious_lookup = {
             "",
         )
     )
-    for item in suspicious_agents
+
+    for item
+    in suspicious_agents
 }
 
 
 # ============================================================
-# BUILD AGENT INTELLIGENCE
+# AGENT INTELLIGENCE
 # ============================================================
 
 intelligence_records = []
@@ -556,17 +578,19 @@ if show_overview:
         "📊 Security Overview"
     )
 
-    col1, col2, col3, col4, col5 = (
+    c1, c2, c3, c4, c5 = (
         st.columns(5)
     )
 
-    with col1:
+    with c1:
+
         st.metric(
             "Total Events",
             total_events,
         )
 
-    with col2:
+    with c2:
+
         st.metric(
             "Allowed",
             decisions.get(
@@ -575,7 +599,8 @@ if show_overview:
             ),
         )
 
-    with col3:
+    with c3:
+
         st.metric(
             "Denied",
             decisions.get(
@@ -584,7 +609,8 @@ if show_overview:
             ),
         )
 
-    with col4:
+    with c4:
+
         st.metric(
             "Average Risk",
             risk.get(
@@ -593,7 +619,8 @@ if show_overview:
             ),
         )
 
-    with col5:
+    with c5:
+
         st.metric(
             "Critical Events",
             risk.get(
@@ -604,11 +631,12 @@ if show_overview:
 
     st.divider()
 
-    risk1, risk2, risk3, risk4 = (
+    r1, r2, r3, r4 = (
         st.columns(4)
     )
 
-    with risk1:
+    with r1:
+
         st.metric(
             "Maximum Risk",
             risk.get(
@@ -617,7 +645,8 @@ if show_overview:
             ),
         )
 
-    with risk2:
+    with r2:
+
         st.metric(
             "High-Risk Events",
             risk.get(
@@ -626,7 +655,8 @@ if show_overview:
             ),
         )
 
-    with risk3:
+    with r3:
+
         st.metric(
             "Suspicious Agents",
             len(
@@ -634,7 +664,8 @@ if show_overview:
             ),
         )
 
-    with risk4:
+    with r4:
+
         st.metric(
             "Repeated Denials",
             len(
@@ -654,12 +685,15 @@ if show_overview:
 
         decision_df = pd.DataFrame(
             {
-                "Decision": list(
-                    decisions.keys()
-                ),
-                "Count": list(
-                    decisions.values()
-                ),
+                "Decision":
+                    list(
+                        decisions.keys()
+                    ),
+
+                "Count":
+                    list(
+                        decisions.values()
+                    ),
             }
         )
 
@@ -686,19 +720,23 @@ if show_overview:
                     "High-Risk Events",
                     "Critical Events",
                 ],
+
                 "Value": [
                     risk.get(
                         "average_risk",
                         0,
                     ),
+
                     risk.get(
                         "maximum_risk",
                         0,
                     ),
+
                     risk.get(
                         "high_risk_events",
                         0,
                     ),
+
                     risk.get(
                         "critical_events",
                         0,
@@ -734,43 +772,14 @@ if show_intelligence:
 
     if not intelligence_df.empty:
 
-        critical_count = int(
-            (
-                intelligence_df[
-                    "priority"
-                ]
-                == "CRITICAL"
-            ).sum()
+        priority_counts = (
+            intelligence_df[
+                "priority"
+            ]
+            .value_counts()
         )
 
-        high_count = int(
-            (
-                intelligence_df[
-                    "priority"
-                ]
-                == "HIGH"
-            ).sum()
-        )
-
-        medium_count = int(
-            (
-                intelligence_df[
-                    "priority"
-                ]
-                == "MEDIUM"
-            ).sum()
-        )
-
-        low_count = int(
-            (
-                intelligence_df[
-                    "priority"
-                ]
-                == "LOW"
-            ).sum()
-        )
-
-        avg_intelligence = round(
+        avg_score = round(
             float(
                 intelligence_df[
                     "intelligence_score"
@@ -784,78 +793,79 @@ if show_intelligence:
         )
 
         with i1:
+
             st.metric(
                 "Avg Intelligence",
-                avg_intelligence,
+                avg_score,
             )
 
         with i2:
+
             st.metric(
                 "Critical",
-                critical_count,
+                int(
+                    priority_counts.get(
+                        "CRITICAL",
+                        0,
+                    )
+                ),
             )
 
         with i3:
+
             st.metric(
                 "High",
-                high_count,
+                int(
+                    priority_counts.get(
+                        "HIGH",
+                        0,
+                    )
+                ),
             )
 
         with i4:
+
             st.metric(
                 "Medium",
-                medium_count,
+                int(
+                    priority_counts.get(
+                        "MEDIUM",
+                        0,
+                    )
+                ),
             )
 
         with i5:
+
             st.metric(
                 "Low",
-                low_count,
+                int(
+                    priority_counts.get(
+                        "LOW",
+                        0,
+                    )
+                ),
             )
 
-        st.subheader(
-            "Agent Security Prioritization"
-        )
-
-        prioritization_columns = [
-            "agent_id",
-            "intelligence_score",
-            "priority",
-            "maximum_risk",
-            "denial_rate",
-            "anomaly_score",
-            "anomaly_severity",
-            "total_requests",
-            "recommended_action",
-        ]
-
-        prioritization_df = (
-            intelligence_df[
-                [
-                    column
-                    for column
-                    in prioritization_columns
-                    if column
-                    in intelligence_df.columns
-                ]
-            ]
+        intelligence_view = (
+            intelligence_df
             .sort_values(
-                by="intelligence_score",
+                "intelligence_score",
                 ascending=False,
             )
         )
 
         st.dataframe(
-            prioritization_df,
+            intelligence_view,
             width="stretch",
             hide_index=True,
         )
 
         st.subheader(
-            "Unified Intelligence Score"
+            "Agent Intelligence Scores"
         )
 
-        score_chart = (
+        st.bar_chart(
             intelligence_df[
                 [
                     "agent_id",
@@ -866,105 +876,29 @@ if show_intelligence:
                 "agent_id"
             )
             .sort_values(
-                by="intelligence_score",
+                "intelligence_score",
                 ascending=False,
-            )
-        )
-
-        st.bar_chart(
-            score_chart,
+            ),
             width="stretch",
         )
 
-        st.subheader(
-            "Priority Investigation Queue"
-        )
-
-        selected_priority = st.selectbox(
-            "Priority",
-            [
-                "ALL",
-                "CRITICAL",
-                "HIGH",
-                "MEDIUM",
-                "LOW",
-            ],
-            key="day20_priority",
-        )
-
-        if selected_priority == "ALL":
-
-            priority_df = (
-                prioritization_df
-            )
-
-        else:
-
-            priority_df = (
-                prioritization_df[
-                    prioritization_df[
-                        "priority"
-                    ]
-                    == selected_priority
-                ]
-            )
-
-        if not priority_df.empty:
-
-            st.dataframe(
-                priority_df,
-                width="stretch",
-                hide_index=True,
-            )
-
-        else:
-
-            st.info(
-                "No agents match the selected priority."
-            )
-
-        if critical_count > 0:
-
-            st.error(
-                f"{critical_count} critical agent(s) "
-                "require immediate investigation."
-            )
-
-        elif high_count > 0:
-
-            st.warning(
-                f"{high_count} high-priority agent(s) "
-                "require analyst investigation."
-            )
-
-        else:
-
-            st.success(
-                "No critical or high-priority agent behavior "
-                "is currently identified."
-            )
-
 
 # ============================================================
-# DAY 21 — CONTROLLED SECURITY SCENARIO LAB
+# DAY 21 — CONTROLLED SECURITY SCENARIOS
 # ============================================================
 
-if show_scenarios:
+if show_day21:
 
     st.divider()
 
     st.header(
-        "🧪 Controlled Security Scenario Lab"
+        "🧪 Day 21 — Controlled Security Scenario Lab"
     )
 
     st.caption(
         "Reproducible benign, suspicious and malicious "
-        "scenarios for controlled security experiments."
+        "security scenarios."
     )
-
-    # --------------------------------------------------------
-    # SCENARIO SUMMARY
-    # --------------------------------------------------------
 
     try:
 
@@ -975,7 +909,7 @@ if show_scenarios:
     except Exception as error:
 
         st.error(
-            "Unable to load scenario framework: "
+            "Unable to load Day 21 scenarios: "
             f"{error}"
         )
 
@@ -993,7 +927,7 @@ if show_scenarios:
     with s1:
 
         st.metric(
-            "Total Scenarios",
+            "Total",
             scenario_summary.get(
                 "total",
                 0,
@@ -1030,14 +964,6 @@ if show_scenarios:
             ),
         )
 
-    # --------------------------------------------------------
-    # SCENARIO CLASSIFICATION
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Scenario Catalog"
-    )
-
     scenario_filter = st.selectbox(
         "Scenario Class",
         [
@@ -1046,7 +972,7 @@ if show_scenarios:
             SUSPICIOUS,
             MALICIOUS,
         ],
-        key="day21_scenario_filter",
+        key="day21_filter",
     )
 
     if scenario_filter == "ALL":
@@ -1069,7 +995,7 @@ if show_scenarios:
             scenarios
         )
 
-        display_columns = [
+        columns = [
             "scenario_id",
             "scenario_type",
             "agent_id",
@@ -1079,16 +1005,298 @@ if show_scenarios:
             "expected_behavior",
         ]
 
+        st.dataframe(
+            scenario_df[
+                [
+                    c
+                    for c
+                    in columns
+                    if c
+                    in scenario_df.columns
+                ]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+    if scenarios:
+
+        selected_id = st.selectbox(
+            "Inspect Scenario",
+            [
+                item[
+                    "scenario_id"
+                ]
+                for item
+                in scenarios
+            ],
+            key="day21_selected_id",
+        )
+
+        selected = next(
+            (
+                item
+                for item
+                in scenarios
+                if item[
+                    "scenario_id"
+                ]
+                == selected_id
+            ),
+            None,
+        )
+
+        if selected:
+
+            left, right = (
+                st.columns(2)
+            )
+
+            with left:
+
+                st.markdown(
+                    "### Definition"
+                )
+
+                st.write(
+                    "**Agent:** "
+                    f"`{selected['agent_id']}`"
+                )
+
+                st.write(
+                    "**Task:** "
+                    f"`{selected['task_id']}`"
+                )
+
+                st.write(
+                    "**Class:** "
+                    f"`{selected['scenario_type']}`"
+                )
+
+            with right:
+
+                st.markdown(
+                    "### Operation"
+                )
+
+                st.write(
+                    "**Action:** "
+                    f"`{selected['action']}`"
+                )
+
+                st.write(
+                    "**Resource:** "
+                    f"`{selected['resource']}`"
+                )
+
+                st.write(
+                    "**Expected:** "
+                    f"`{selected['expected_behavior']}`"
+                )
+
+            st.info(
+                selected.get(
+                    "description",
+                    "",
+                )
+            )
+
+
+# ============================================================
+# DAY 22 — ATTACK SCENARIO RESEARCH LAB
+# ============================================================
+
+if show_day22:
+
+    st.divider()
+
+    st.header(
+        "⚔️ Day 22 — Controlled Attack Scenario Research Lab"
+    )
+
+    st.caption(
+        "Structured attack scenarios for reproducible "
+        "security detection experiments."
+    )
+
+    # --------------------------------------------------------
+    # SUMMARY
+    # --------------------------------------------------------
+
+    try:
+
+        attack_summary = (
+            get_attack_scenario_summary()
+        )
+
+    except Exception as error:
+
+        st.error(
+            "Unable to load attack scenarios: "
+            f"{error}"
+        )
+
+        attack_summary = {
+            "total": 0,
+            "malicious": 0,
+            "benign": 0,
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0,
+        }
+
+    a1, a2, a3, a4, a5 = (
+        st.columns(5)
+    )
+
+    with a1:
+
+        st.metric(
+            "Total Scenarios",
+            attack_summary.get(
+                "total",
+                0,
+            ),
+        )
+
+    with a2:
+
+        st.metric(
+            "Malicious",
+            attack_summary.get(
+                "malicious",
+                0,
+            ),
+        )
+
+    with a3:
+
+        st.metric(
+            "Benign",
+            attack_summary.get(
+                "benign",
+                0,
+            ),
+        )
+
+    with a4:
+
+        st.metric(
+            "Critical",
+            attack_summary.get(
+                "critical",
+                0,
+            ),
+        )
+
+    with a5:
+
+        st.metric(
+            "High",
+            attack_summary.get(
+                "high",
+                0,
+            ),
+        )
+
+    st.divider()
+
+    # --------------------------------------------------------
+    # FILTERS
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Attack Scenario Catalog"
+    )
+
+    filter1, filter2 = (
+        st.columns(2)
+    )
+
+    with filter1:
+
+        attack_type = st.selectbox(
+            "Attack Type",
+            [
+                "ALL"
+            ]
+            + list(
+                ATTACK_SCENARIO_TYPES
+            ),
+            key="day22_attack_type",
+        )
+
+    with filter2:
+
+        attack_severity = st.selectbox(
+            "Severity",
+            [
+                "ALL",
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
+            ],
+            key="day22_attack_severity",
+        )
+
+    if attack_type == "ALL":
+
+        filtered_attacks = (
+            get_attack_scenarios()
+        )
+
+    else:
+
+        filtered_attacks = (
+            get_attack_scenarios_by_type(
+                attack_type
+            )
+        )
+
+    if attack_severity != "ALL":
+
+        filtered_attacks = [
+            item
+            for item
+            in filtered_attacks
+            if item[
+                "severity"
+            ]
+            == attack_severity
+        ]
+
+    # --------------------------------------------------------
+    # TABLE
+    # --------------------------------------------------------
+
+    if filtered_attacks:
+
+        attack_df = pd.DataFrame(
+            filtered_attacks
+        )
+
+        display_columns = [
+            "scenario_id",
+            "name",
+            "scenario_type",
+            "agent_id",
+            "severity",
+            "ground_truth",
+            "expected_signal",
+        ]
+
         display_columns = [
             column
             for column
             in display_columns
             if column
-            in scenario_df.columns
+            in attack_df.columns
         ]
 
         st.dataframe(
-            scenario_df[
+            attack_df[
                 display_columns
             ],
             width="stretch",
@@ -1098,49 +1306,38 @@ if show_scenarios:
     else:
 
         st.info(
-            "No scenarios match the selected class."
+            "No attack scenarios match the selected filters."
         )
 
     # --------------------------------------------------------
-    # SCENARIO INVESTIGATION
+    # INVESTIGATION
     # --------------------------------------------------------
 
-    if scenarios:
+    if filtered_attacks:
 
         st.subheader(
-            "Scenario Investigation"
+            "Attack Scenario Investigation"
         )
 
-        scenario_ids = [
-            scenario[
-                "scenario_id"
-            ]
-            for scenario
-            in scenarios
-        ]
+        selected_attack_id = st.selectbox(
+            "Select Attack Scenario",
+            [
+                item[
+                    "scenario_id"
+                ]
+                for item
+                in filtered_attacks
+            ],
+            key="day22_selected_attack",
+        )
 
-        selected_scenario_id = (
-            st.selectbox(
-                "Select Scenario",
-                scenario_ids,
-                key="day21_selected_scenario",
+        selected_attack = (
+            get_attack_scenario(
+                selected_attack_id
             )
         )
 
-        selected_scenario = next(
-            (
-                scenario
-                for scenario
-                in scenarios
-                if scenario[
-                    "scenario_id"
-                ]
-                == selected_scenario_id
-            ),
-            None,
-        )
-
-        if selected_scenario:
+        if selected_attack:
 
             detail1, detail2 = (
                 st.columns(2)
@@ -1153,146 +1350,182 @@ if show_scenarios:
                 )
 
                 st.write(
-                    "**Scenario ID:** "
-                    f"`{selected_scenario['scenario_id']}`"
+                    "**ID:** "
+                    f"`{selected_attack['scenario_id']}`"
                 )
 
                 st.write(
-                    "**Class:** "
-                    f"`{selected_scenario['scenario_type']}`"
+                    "**Name:** "
+                    f"{selected_attack['name']}"
+                )
+
+                st.write(
+                    "**Category:** "
+                    f"`{selected_attack['scenario_type']}`"
                 )
 
                 st.write(
                     "**Agent:** "
-                    f"`{selected_scenario['agent_id']}`"
+                    f"`{selected_attack['agent_id']}`"
                 )
 
                 st.write(
                     "**Task:** "
-                    f"`{selected_scenario['task_id']}`"
+                    f"`{selected_attack['task_id']}`"
+                )
+
+                st.write(
+                    "**Severity:** "
+                    f"`{selected_attack['severity']}`"
                 )
 
             with detail2:
 
                 st.markdown(
-                    "### Requested Operation"
+                    "### Research Ground Truth"
                 )
 
                 st.write(
-                    "**Action:** "
-                    f"`{selected_scenario['action']}`"
+                    "**Ground Truth:** "
+                    f"`{selected_attack['ground_truth']}`"
                 )
 
                 st.write(
-                    "**Resource:** "
-                    f"`{selected_scenario['resource']}`"
+                    "**Expected Signal:** "
+                    f"`{selected_attack['expected_signal']}`"
                 )
 
-                st.write(
-                    "**Expected Decision:** "
-                    f"`{selected_scenario['expected_behavior']}`"
+                st.markdown(
+                    "**Actions**"
                 )
+
+                for action in selected_attack[
+                    "actions"
+                ]:
+
+                    st.code(
+                        action
+                    )
+
+                st.markdown(
+                    "**Resources**"
+                )
+
+                for resource in selected_attack[
+                    "resources"
+                ]:
+
+                    st.code(
+                        resource
+                    )
 
             st.info(
-                selected_scenario.get(
-                    "description",
-                    "No description available.",
-                )
+                selected_attack[
+                    "description"
+                ]
+            )
+
+            st.success(
+                "Evaluation purpose: "
+                + selected_attack[
+                    "evaluation_purpose"
+                ]
             )
 
     # --------------------------------------------------------
-    # REPRODUCIBLE EXPERIMENT SAMPLER
+    # REPRODUCIBLE EXPERIMENT
     # --------------------------------------------------------
 
     st.subheader(
-        "Reproducible Experiment Sampler"
+        "Reproducible Attack Experiment"
     )
 
-    sampler1, sampler2 = (
+    e1, e2 = (
         st.columns(2)
     )
 
-    with sampler1:
+    with e1:
 
-        sample_count = st.number_input(
-            "Number of Scenarios",
+        attack_count = st.number_input(
+            "Scenario Count",
             min_value=1,
-            max_value=50,
-            value=9,
+            max_value=8,
+            value=8,
             step=1,
-            key="day21_sample_count",
+            key="day22_attack_count",
         )
 
-    with sampler2:
+    with e2:
 
-        random_seed = st.number_input(
+        attack_seed = st.number_input(
             "Experiment Seed",
             min_value=0,
             max_value=999999,
             value=42,
             step=1,
-            key="day21_seed",
+            key="day22_attack_seed",
         )
 
     if st.button(
-        "🎲 Generate Reproducible Scenario Set",
-        key="day21_generate_scenarios",
+        "⚔️ Generate Attack Experiment",
+        key="day22_generate_attack",
         type="primary",
     ):
 
         try:
 
-            sampled = sample_scenarios(
-                count=int(
-                    sample_count
-                ),
-                seed=int(
-                    random_seed
-                ),
-            )
-
-            sampled_df = pd.DataFrame(
-                sampled
+            generated = (
+                sample_attack_scenarios(
+                    count=int(
+                        attack_count
+                    ),
+                    seed=int(
+                        attack_seed
+                    ),
+                )
             )
 
             st.session_state[
-                "day21_sampled_scenarios"
-            ] = sampled_df
+                "day22_attack_experiment"
+            ] = pd.DataFrame(
+                generated
+            )
 
             st.success(
-                "Reproducible scenario set generated."
+                "Reproducible attack experiment generated."
             )
 
         except Exception as error:
 
             st.error(
-                "Unable to generate scenario set: "
+                "Attack experiment failed: "
                 f"{error}"
             )
 
-    if (
-        st.session_state[
-            "day21_sampled_scenarios"
-        ]
-        is not None
-    ):
+    # --------------------------------------------------------
+    # EXPERIMENT OUTPUT
+    # --------------------------------------------------------
+
+    experiment_df = (
+        st.session_state.get(
+            "day22_attack_experiment"
+        )
+    )
+
+    if experiment_df is not None:
 
         st.subheader(
             "Generated Experimental Dataset"
         )
 
         st.dataframe(
-            st.session_state[
-                "day21_sampled_scenarios"
-            ],
+            experiment_df,
             width="stretch",
             hide_index=True,
         )
 
-        csv_data = (
-            st.session_state[
-                "day21_sampled_scenarios"
-            ]
+        attack_csv = (
+            experiment_df
             .to_csv(
                 index=False
             )
@@ -1302,40 +1535,50 @@ if show_scenarios:
         )
 
         st.download_button(
-            "⬇️ Export Scenario Dataset",
-            data=csv_data,
+            "⬇️ Export Attack Experiment",
+            data=attack_csv,
             file_name=(
-                "aegisguard_day21_scenarios.csv"
+                "aegisguard_day22_attack_scenarios.csv"
             ),
             mime="text/csv",
+            key="day22_export",
         )
 
     # --------------------------------------------------------
-    # SCENARIO DISTRIBUTION
+    # SEVERITY DISTRIBUTION
     # --------------------------------------------------------
 
     st.subheader(
-        "Scenario Distribution"
+        "Attack Severity Distribution"
     )
 
-    distribution_df = pd.DataFrame(
+    severity_df = pd.DataFrame(
         {
-            "Scenario Type": [
-                "Benign",
-                "Suspicious",
-                "Malicious",
+            "Severity": [
+                "CRITICAL",
+                "HIGH",
+                "MEDIUM",
+                "LOW",
             ],
+
             "Count": [
-                scenario_summary.get(
-                    "benign",
+                attack_summary.get(
+                    "critical",
                     0,
                 ),
-                scenario_summary.get(
-                    "suspicious",
+
+                attack_summary.get(
+                    "high",
                     0,
                 ),
-                scenario_summary.get(
-                    "malicious",
+
+                attack_summary.get(
+                    "medium",
+                    0,
+                ),
+
+                attack_summary.get(
+                    "low",
                     0,
                 ),
             ],
@@ -1343,53 +1586,43 @@ if show_scenarios:
     )
 
     st.bar_chart(
-        distribution_df.set_index(
-            "Scenario Type"
+        severity_df.set_index(
+            "Severity"
         ),
         width="stretch",
     )
 
     # --------------------------------------------------------
-    # RESEARCH METHODOLOGY
+    # RESEARCH SIGNIFICANCE
     # --------------------------------------------------------
 
     st.subheader(
-        "Experimental Methodology"
+        "Day 22 Research Significance"
     )
 
     st.markdown(
         """
-        **Benign scenarios**
+        Day 22 introduces a structured attack taxonomy
+        for controlled security evaluation.
 
-        Represent expected and authorized agent behavior.
+        Each scenario defines:
 
-        **Suspicious scenarios**
+        **Attack Type → Agent → Task → Actions → Resources
+        → Severity → Ground Truth → Expected Signal**
 
-        Represent behavior that violates normal access
-        expectations or behavioral patterns.
+        The framework deliberately includes legitimate
+        high-volume activity so that future experiments
+        can measure false-positive behavior rather than
+        evaluating only obvious malicious cases.
 
-        **Malicious scenarios**
-
-        Represent controlled unauthorized actions used
-        to evaluate AegisGuard's security controls.
-
-        **Reproducibility**
-
-        Every generated scenario set uses an explicit
-        random seed. The same seed produces the same
-        scenario selection.
-
-        **Research purpose**
-
-        The controlled scenario framework establishes
-        labeled experimental cases for the evaluation
-        phase beginning with Days 22–30.
+        These scenarios form the basis for the experimental
+        dataset and evaluation pipeline planned for Days 23–30.
         """
     )
 
 
 # ============================================================
-# DAY 19 — BEHAVIORAL ANOMALY DETECTION
+# DAY 19 — ANOMALY DETECTION
 # ============================================================
 
 if show_anomalies:
@@ -1400,11 +1633,11 @@ if show_anomalies:
         "🚨 Behavioral Anomaly Detection"
     )
 
-    a1, a2, a3, a4 = (
+    an1, an2, an3, an4 = (
         st.columns(4)
     )
 
-    with a1:
+    with an1:
 
         st.metric(
             "Agents Analyzed",
@@ -1414,7 +1647,7 @@ if show_anomalies:
             ),
         )
 
-    with a2:
+    with an2:
 
         st.metric(
             "High Anomaly",
@@ -1424,7 +1657,7 @@ if show_anomalies:
             ),
         )
 
-    with a3:
+    with an3:
 
         st.metric(
             "Medium Anomaly",
@@ -1434,7 +1667,7 @@ if show_anomalies:
             ),
         )
 
-    with a4:
+    with an4:
 
         st.metric(
             "Normal",
@@ -1452,41 +1685,41 @@ if show_anomalies:
 
             anomaly_rows.append(
                 {
-                    "Agent": item.get(
-                        "agent_id",
-                        "",
-                    ),
-                    "Anomaly Score": safe_float(
+                    "Agent":
                         item.get(
-                            "anomaly_score",
-                            0,
-                        )
-                    ),
-                    "Severity": item.get(
-                        "anomaly_severity",
-                        "NORMAL",
-                    ),
-                    "Denial Rate": round(
+                            "agent_id",
+                            "",
+                        ),
+
+                    "Anomaly Score":
                         safe_float(
                             item.get(
-                                "denial_rate",
+                                "anomaly_score",
                                 0,
                             )
-                        ) * 100,
-                        2,
-                    ),
-                    "Average Risk": safe_float(
+                        ),
+
+                    "Severity":
                         item.get(
-                            "average_risk",
-                            0,
-                        )
-                    ),
-                    "Critical Requests": safe_int(
-                        item.get(
-                            "critical_requests",
-                            0,
-                        )
-                    ),
+                            "anomaly_severity",
+                            "NORMAL",
+                        ),
+
+                    "Average Risk":
+                        safe_float(
+                            item.get(
+                                "average_risk",
+                                0,
+                            )
+                        ),
+
+                    "Critical Requests":
+                        safe_int(
+                            item.get(
+                                "critical_requests",
+                                0,
+                            )
+                        ),
                 }
             )
 
@@ -1500,25 +1733,9 @@ if show_anomalies:
             hide_index=True,
         )
 
-        st.subheader(
-            "Anomaly Score Distribution"
-        )
-
-        st.bar_chart(
-            anomaly_df[
-                [
-                    "Agent",
-                    "Anomaly Score",
-                ]
-            ].set_index(
-                "Agent"
-            ),
-            width="stretch",
-        )
-
 
 # ============================================================
-# DAY 18 — BEHAVIORAL FEATURE ANALYTICS
+# DAY 18 — BEHAVIORAL FEATURES
 # ============================================================
 
 if show_features:
@@ -1535,61 +1752,11 @@ if show_features:
             behavioral_features
         )
 
-        f1, f2, f3 = (
-            st.columns(3)
-        )
-
-        with f1:
-
-            st.metric(
-                "Agents Profiled",
-                len(
-                    behavior_df
-                ),
-            )
-
-        with f2:
-
-            if (
-                "average_risk"
-                in behavior_df.columns
-            ):
-
-                st.metric(
-                    "Mean Agent Risk",
-                    round(
-                        float(
-                            behavior_df[
-                                "average_risk"
-                            ].mean()
-                        ),
-                        2,
-                    ),
-                )
-
-        with f3:
-
-            if (
-                "denial_rate"
-                in behavior_df.columns
-            ):
-
-                high_denial = int(
-                    (
-                        behavior_df[
-                            "denial_rate"
-                        ]
-                        >= 0.50
-                    ).sum()
-                )
-
-                st.metric(
-                    "High-Denial Agents",
-                    high_denial,
-                )
-
-        st.subheader(
-            "Behavioral Feature Matrix"
+        st.metric(
+            "Agents Profiled",
+            len(
+                behavior_df
+            ),
         )
 
         st.dataframe(
@@ -1600,10 +1767,14 @@ if show_features:
 
         try:
 
+            feature_names = (
+                get_behavior_feature_names()
+            )
+
             available_features = [
                 feature
                 for feature
-                in get_behavior_feature_names()
+                in feature_names
                 if feature
                 in behavior_df.columns
             ]
@@ -1624,13 +1795,16 @@ if show_features:
                 st.selectbox(
                     "Explore Feature",
                     available_features,
-                    key="day21_feature_explorer",
+                    key="feature_explorer",
                 )
             )
 
-            if "agent_id" in behavior_df.columns:
+            if (
+                "agent_id"
+                in behavior_df.columns
+            ):
 
-                feature_chart = (
+                st.bar_chart(
                     behavior_df[
                         [
                             "agent_id",
@@ -1639,27 +1813,19 @@ if show_features:
                     ]
                     .set_index(
                         "agent_id"
-                    )
-                    .sort_values(
-                        by=selected_feature,
-                        ascending=False,
-                    )
-                )
-
-                st.bar_chart(
-                    feature_chart,
+                    ),
                     width="stretch",
                 )
 
     else:
 
         st.info(
-            "No behavioral features are available."
+            "No behavioral features available."
         )
 
 
 # ============================================================
-# DAY 17 — SECURITY INVESTIGATION ENGINE
+# DAY 17 — INVESTIGATION
 # ============================================================
 
 if show_investigation:
@@ -1668,11 +1834,6 @@ if show_investigation:
 
     st.header(
         "🔎 Security Investigation Engine"
-    )
-
-    st.caption(
-        "Investigate individual events and retrieve "
-        "supporting security evidence."
     )
 
     try:
@@ -1694,72 +1855,55 @@ if show_investigation:
 
     with inv1:
 
-        selected_agent = st.selectbox(
-            "Agent",
-            [
-                "ALL"
-            ]
-            + filter_options.get(
-                "agents",
-                [],
-            ),
-            key="investigation_agent",
+        investigation_agent = (
+            st.selectbox(
+                "Agent",
+                [
+                    "ALL"
+                ]
+                + filter_options.get(
+                    "agents",
+                    [],
+                ),
+                key="investigation_agent",
+            )
         )
 
     with inv2:
 
-        selected_action = st.selectbox(
-            "Action",
-            [
-                "ALL"
-            ]
-            + filter_options.get(
-                "actions",
-                [],
-            ),
-            key="investigation_action",
+        investigation_action = (
+            st.selectbox(
+                "Action",
+                [
+                    "ALL"
+                ]
+                + filter_options.get(
+                    "actions",
+                    [],
+                ),
+                key="investigation_action",
+            )
         )
 
     with inv3:
 
-        selected_decision = st.selectbox(
-            "Decision",
-            [
-                "ALL",
-                "ALLOW",
-                "DENY",
-            ],
-            key="investigation_decision",
+        investigation_decision = (
+            st.selectbox(
+                "Decision",
+                [
+                    "ALL",
+                    "ALLOW",
+                    "DENY",
+                ],
+                key="investigation_decision",
+            )
         )
 
-    run_col, clear_col = (
-        st.columns(2)
-    )
-
-    with run_col:
-
-        run_investigation = st.button(
-            "🔍 Investigate Events",
-            width="stretch",
-            type="primary",
-        )
-
-    with clear_col:
-
-        clear_investigation = st.button(
-            "↺ Clear Results",
-            width="stretch",
-        )
-
-    if clear_investigation:
-
-        st.session_state.investigation_results = []
-
-        st.session_state.investigation_executed = False
-
-        st.rerun()
-
-    if run_investigation:
+    if st.button(
+        "🔍 Investigate Events",
+        type="primary",
+        key="run_investigation",
+    ):
 
         try:
 
@@ -1767,42 +1911,53 @@ if show_investigation:
                 get_investigation_events(
                     agent_id=(
                         None
-                        if selected_agent == "ALL"
-                        else selected_agent
+                        if investigation_agent
+                        == "ALL"
+                        else investigation_agent
                     ),
+
                     action=(
                         None
-                        if selected_action == "ALL"
-                        else selected_action
+                        if investigation_action
+                        == "ALL"
+                        else investigation_action
                     ),
+
                     decision=(
                         None
-                        if selected_decision == "ALL"
-                        else selected_decision
+                        if investigation_decision
+                        == "ALL"
+                        else investigation_decision
                     ),
+
                     limit=100,
                 )
             )
 
-            st.session_state.investigation_results = (
-                results
-            )
+            st.session_state[
+                "investigation_results"
+            ] = results
 
-            st.session_state.investigation_executed = (
-                True
-            )
+            st.session_state[
+                "investigation_executed"
+            ] = True
 
         except Exception as error:
 
             st.error(
-                f"Investigation failed: {error}"
+                "Investigation failed: "
+                f"{error}"
             )
 
-    if st.session_state.investigation_executed:
+    if (
+        st.session_state[
+            "investigation_executed"
+        ]
+    ):
 
-        results = (
-            st.session_state.investigation_results
-        )
+        results = st.session_state[
+            "investigation_results"
+        ]
 
         if results:
 
@@ -1823,86 +1978,6 @@ if show_investigation:
                 hide_index=True,
             )
 
-            event_ids = [
-                event.get(
-                    "id"
-                )
-                for event
-                in results
-                if event.get(
-                    "id"
-                ) is not None
-            ]
-
-            if event_ids:
-
-                st.subheader(
-                    "Selected Event Evidence"
-                )
-
-                selected_event_id = st.selectbox(
-                    "Event ID",
-                    event_ids,
-                    key="selected_investigation_event",
-                )
-
-                selected_event = None
-
-                try:
-
-                    selected_event = (
-                        get_investigation_event(
-                            int(
-                                selected_event_id
-                            )
-                        )
-                    )
-
-                except Exception as error:
-
-                    st.error(
-                        "Unable to retrieve event: "
-                        f"{error}"
-                    )
-
-                if selected_event:
-
-                    evidence_rows = []
-
-                    for field in [
-                        "id",
-                        "timestamp",
-                        "agent_id",
-                        "task_id",
-                        "action",
-                        "resource",
-                        "decision",
-                        "risk",
-                        "reason",
-                    ]:
-
-                        evidence_rows.append(
-                            {
-                                "Evidence Field": field,
-                                "Observed Value": str(
-                                    selected_event.get(
-                                        field,
-                                        "",
-                                    )
-                                ),
-                            }
-                        )
-
-                    evidence_df = pd.DataFrame(
-                        evidence_rows
-                    )
-
-                    st.dataframe(
-                        evidence_df,
-                        width="stretch",
-                        hide_index=True,
-                    )
-
         else:
 
             st.info(
@@ -1911,7 +1986,7 @@ if show_investigation:
 
 
 # ============================================================
-# AGENT INTELLIGENCE
+# AGENT ACTIVITY
 # ============================================================
 
 if show_agents:
@@ -1919,7 +1994,7 @@ if show_agents:
     st.divider()
 
     st.header(
-        "👤 Agent Intelligence"
+        "👤 Agent Activity"
     )
 
     if agents:
@@ -1934,14 +2009,20 @@ if show_agents:
             hide_index=True,
         )
 
-        if {
+        required_agent_columns = {
             "total_requests",
             "denied_requests",
-        }.issubset(
+        }
+
+        if required_agent_columns.issubset(
             agent_df.columns
         ):
 
-            activity_df = (
+            st.subheader(
+                "Request Activity"
+            )
+
+            st.bar_chart(
                 agent_df[
                     [
                         "agent_id",
@@ -1951,22 +2032,14 @@ if show_agents:
                 ]
                 .set_index(
                     "agent_id"
-                )
-            )
-
-            st.subheader(
-                "Agent Request Activity"
-            )
-
-            st.bar_chart(
-                activity_df,
+                ),
                 width="stretch",
             )
 
     else:
 
         st.info(
-            "No agent activity is currently available."
+            "No agent activity available."
         )
 
 
@@ -2002,170 +2075,131 @@ if show_high_risk:
 
 
 # ============================================================
-# SECURITY ARCHITECTURE
+# RESEARCH ARCHITECTURE
 # ============================================================
 
 st.divider()
 
 st.header(
-    "🏗️ AegisGuard Security Research Architecture"
+    "🏗️ AegisGuard Research Architecture"
 )
 
-architecture1, architecture2 = (
+architecture_left, architecture_right = (
     st.columns(2)
 )
 
-with architecture1:
+with architecture_left:
 
     st.markdown(
         """
-        ### Enforcement & Telemetry
+        ### Security Control Plane
 
-        **Agent Request**
-
-        ↓
-
-        **Identity / Authorization**
+        Agent Request
 
         ↓
 
-        **Policy Evaluation**
+        Identity / Authorization
 
         ↓
 
-        **Risk Assessment**
+        Policy Evaluation
 
         ↓
 
-        **ALLOW / DENY**
+        Risk Assessment
 
         ↓
 
-        **Security Telemetry**
+        ALLOW / DENY
+
+        ↓
+
+        Security Telemetry
         """
     )
 
-with architecture2:
+with architecture_right:
 
     st.markdown(
         """
         ### Research Intelligence
 
-        **Security Telemetry**
+        Security Telemetry
 
         ↓
 
-        **Behavioral Features**
+        Behavioral Features
 
         ↓
 
-        **Anomaly Detection**
+        Anomaly Detection
 
         ↓
 
-        **Integrated Intelligence**
+        Integrated Intelligence
 
         ↓
 
-        **Controlled Scenarios**
+        Controlled Scenarios
 
         ↓
 
-        **Experimental Evaluation**
+        Attack Experiments
+
+        ↓
+
+        Quantitative Evaluation
         """
     )
 
 
 # ============================================================
-# DAY 21 RESEARCH MILESTONE
+# DAY 22 RESEARCH MILESTONE
 # ============================================================
 
 st.divider()
 
 st.header(
-    "🔬 Day 21 Research Milestone"
+    "🔬 Day 22 Research Milestone"
 )
 
 st.markdown(
     """
-    ### Controlled Security Scenario Framework
+    **Controlled Attack Scenario Framework**
 
-    Day 21 introduces a reproducible experimental layer
-    to AegisGuard.
+    Day 22 extends the controlled scenario system into a
+    structured attack taxonomy.
 
-    The framework separates controlled behaviors into:
+    The experimental framework now distinguishes:
 
-    **BENIGN**
+    - Direct unauthorized access
+    - Repeated authorization abuse
+    - Privilege expansion
+    - High-risk request bursts
+    - Resource enumeration
+    - Behavioral drift
+    - Legitimate high-volume activity
+    - Multi-stage attack sequences
 
-    Expected and authorized agent behavior.
+    Every scenario has an explicit ground-truth label,
+    severity classification and expected security signal.
 
-    **SUSPICIOUS**
-
-    Behavior that deviates from expected access patterns.
-
-    **MALICIOUS**
-
-    Controlled unauthorized behavior designed to test
-    security enforcement and detection.
-
-    Each scenario contains a defined agent, task, action,
-    resource and expected security decision.
-
-    A deterministic random seed allows experiments to be
-    reproduced using the same scenario selection.
-
-    This framework establishes the experimental foundation
-    for Days 22–30, where detection performance can be
-    evaluated using measurable security metrics.
+    This makes the scenarios suitable for controlled
+    experimental evaluation during the next phase of
+    AegisGuard development.
     """
 )
 
 
 # ============================================================
-# RESEARCH METHODOLOGY
-# ============================================================
-
-st.subheader(
-    "Experimental Research Pipeline"
-)
-
-st.markdown(
-    """
-    ```text
-    Controlled Scenario
-            ↓
-    AegisGuard Security Engine
-            ↓
-    Authorization Decision
-            ↓
-    Risk Assessment
-            ↓
-    Security Telemetry
-            ↓
-    Behavioral Features
-            ↓
-    Anomaly Detection
-            ↓
-    Intelligence Prioritization
-            ↓
-    Investigation Evidence
-            ↓
-    Experimental Evaluation
-    ```
-    """
-)
-
-
-# ============================================================
-# RESEARCH LIMITATION
+# RESEARCH WARNING
 # ============================================================
 
 st.warning(
-    "Research limitation: the Day 21 scenarios are "
-    "controlled synthetic test cases. They should not be "
-    "presented as evidence of real-world attack detection "
-    "until they are evaluated against appropriately designed "
-    "datasets and experiments."
+    "Research limitation: these are controlled synthetic "
+    "scenarios. They must not be presented as evidence of "
+    "real-world attack detection until validated through "
+    "appropriate datasets, experiments and statistical analysis."
 )
 
 
@@ -2181,5 +2215,5 @@ st.caption(
 )
 
 st.caption(
-    "Research Prototype • Day 21 • Controlled Security Scenarios"
+    "Research Prototype • Day 22 • Controlled Attack Scenarios"
 )

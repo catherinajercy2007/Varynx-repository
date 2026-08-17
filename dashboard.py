@@ -26,7 +26,7 @@ from app.behavior import (
 
 
 # ============================================================
-# AEGISGUARD — INVESTIGATION
+# AEGISGUARD — INVESTIGATION ENGINE
 # ============================================================
 
 from app.investigation import (
@@ -57,11 +57,26 @@ from app.anomaly import (
 
 
 # ============================================================
+# AEGISGUARD — DAY 21 SCENARIO FRAMEWORK
+# ============================================================
+
+from app.scenarios import (
+    BENIGN,
+    SUSPICIOUS,
+    MALICIOUS,
+    get_scenario_catalog,
+    get_scenarios,
+    get_scenario_summary,
+    sample_scenarios,
+)
+
+
+# ============================================================
 # PAGE CONFIGURATION
 # ============================================================
 
 st.set_page_config(
-    page_title="AegisGuard Intelligence SOC",
+    page_title="AegisGuard Security Intelligence Center",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -77,6 +92,9 @@ if "investigation_results" not in st.session_state:
 
 if "investigation_executed" not in st.session_state:
     st.session_state.investigation_executed = False
+
+if "day21_sampled_scenarios" not in st.session_state:
+    st.session_state.day21_sampled_scenarios = None
 
 
 # ============================================================
@@ -97,7 +115,11 @@ def safe_int(value, default=0):
         return default
 
 
-def clamp(value, minimum=0.0, maximum=100.0):
+def clamp(
+    value,
+    minimum=0.0,
+    maximum=100.0,
+):
     return max(
         minimum,
         min(
@@ -113,9 +135,8 @@ def calculate_agent_intelligence(
     suspicious_lookup,
 ):
     """
-    Build a unified security-intelligence record.
-
-    This is an integration layer, not a new ML model.
+    Build an explainable agent-level security
+    intelligence record from existing signals.
     """
 
     agent_id = str(
@@ -147,21 +168,12 @@ def calculate_agent_intelligence(
     )
 
     if total_requests > 0:
-
         denial_rate = (
             denied_requests
-            /
-            total_requests
+            / total_requests
         )
-
     else:
-
         denial_rate = 0.0
-
-
-    # --------------------------------------------------------
-    # ANOMALY SIGNAL
-    # --------------------------------------------------------
 
     anomaly = anomaly_lookup.get(
         agent_id,
@@ -182,136 +194,71 @@ def calculate_agent_intelligence(
         )
     ).upper()
 
-
-    # Convert the statistical anomaly score
-    # into a bounded intelligence signal.
-
     anomaly_signal = clamp(
-        anomaly_score
-        / 3.0
-        * 100.0
+        anomaly_score / 3.0 * 100.0
     )
-
-
-    # --------------------------------------------------------
-    # DENIAL SIGNAL
-    # --------------------------------------------------------
 
     denial_signal = clamp(
         denial_rate * 100.0
     )
 
-
-    # --------------------------------------------------------
-    # RISK SIGNAL
-    # --------------------------------------------------------
-
     risk_signal = clamp(
         maximum_risk
     )
 
-
-    # --------------------------------------------------------
-    # SUSPICIOUS BEHAVIOR SIGNAL
-    # --------------------------------------------------------
-
-    suspicious_signal = 100.0 if (
-        agent_id in suspicious_lookup
-    ) else 0.0
-
-
-    # --------------------------------------------------------
-    # ANOMALY SEVERITY BONUS
-    # --------------------------------------------------------
+    suspicious_signal = (
+        100.0
+        if agent_id in suspicious_lookup
+        else 0.0
+    )
 
     severity_bonus = {
-
         "NORMAL": 0.0,
-
         "LOW": 5.0,
-
         "MEDIUM": 15.0,
-
         "HIGH": 25.0,
-
     }.get(
         anomaly_severity,
         0.0,
     )
 
-
-    # --------------------------------------------------------
-    # UNIFIED INTELLIGENCE SCORE
-    # --------------------------------------------------------
-
     intelligence_score = (
         (risk_signal * 0.35)
-        +
-        (denial_signal * 0.25)
-        +
-        (anomaly_signal * 0.25)
-        +
-        (suspicious_signal * 0.15)
-        +
-        severity_bonus
+        + (denial_signal * 0.25)
+        + (anomaly_signal * 0.25)
+        + (suspicious_signal * 0.15)
+        + severity_bonus
     )
-
 
     intelligence_score = clamp(
         intelligence_score
     )
 
-
-    # --------------------------------------------------------
-    # PRIORITY
-    # --------------------------------------------------------
-
     if intelligence_score >= 80:
-
         priority = "CRITICAL"
-
     elif intelligence_score >= 60:
-
         priority = "HIGH"
-
     elif intelligence_score >= 35:
-
         priority = "MEDIUM"
-
     else:
-
         priority = "LOW"
 
-
-    # --------------------------------------------------------
-    # RECOMMENDED ACTION
-    # --------------------------------------------------------
-
     if priority == "CRITICAL":
-
         recommended_action = (
-            "Immediate investigation and "
-            "containment review"
+            "Immediate investigation and containment review"
         )
-
     elif priority == "HIGH":
-
         recommended_action = (
             "Prioritize analyst investigation"
         )
-
     elif priority == "MEDIUM":
-
         recommended_action = (
             "Increase monitoring and review behavior"
         )
-
     else:
-
         recommended_action = (
             "Continue normal monitoring"
         )
-
 
     return {
         "agent_id": agent_id,
@@ -348,8 +295,9 @@ st.title(
 )
 
 st.caption(
-    "Integrated behavior-aware security intelligence "
-    "for autonomous AI agent authorization and monitoring"
+    "Behavior-aware security control plane for "
+    "autonomous AI agent authorization, monitoring, "
+    "investigation and controlled experimentation."
 )
 
 st.divider()
@@ -380,13 +328,13 @@ with st.sidebar:
         value=True,
     )
 
-    show_investigation = st.checkbox(
-        "Investigation",
+    show_intelligence = st.checkbox(
+        "Integrated Intelligence",
         value=True,
     )
 
-    show_features = st.checkbox(
-        "Behavioral Features",
+    show_scenarios = st.checkbox(
+        "Day 21 Scenario Lab",
         value=True,
     )
 
@@ -395,8 +343,13 @@ with st.sidebar:
         value=True,
     )
 
-    show_intelligence = st.checkbox(
-        "Integrated Intelligence",
+    show_features = st.checkbox(
+        "Behavioral Features",
+        value=True,
+    )
+
+    show_investigation = st.checkbox(
+        "Investigation",
         value=True,
     )
 
@@ -418,28 +371,38 @@ with st.sidebar:
 
     st.markdown(
         """
+        **Days 1–15**
+        Security Foundation
+
+        ↓
+
         **Day 16**
-        Security Operations Center
+        Advanced SOC
 
         ↓
 
         **Day 17**
-        Event Investigation
+        Investigation
 
         ↓
 
         **Day 18**
-        Behavioral Feature Engineering
+        Behavioral Features
 
         ↓
 
         **Day 19**
-        Behavioral Anomaly Detection
+        Anomaly Detection
 
         ↓
 
         **Day 20**
-        Integrated Security Intelligence
+        Integrated Intelligence
+
+        ↓
+
+        **Day 21**
+        Controlled Scenarios
         """
     )
 
@@ -450,12 +413,12 @@ with st.sidebar:
     )
 
     st.caption(
-        "Day 20 • Intelligence Integration"
+        "Day 21 • Experimental Security Scenarios"
     )
 
 
 # ============================================================
-# LOAD SECURITY DATA
+# LOAD CORE SECURITY DATA
 # ============================================================
 
 try:
@@ -477,7 +440,7 @@ try:
 except Exception as error:
 
     st.error(
-        "Unable to load core AegisGuard security data: "
+        "Unable to load core security data: "
         f"{error}"
     )
 
@@ -485,7 +448,7 @@ except Exception as error:
 
 
 # ============================================================
-# LOAD BEHAVIORAL DATA
+# LOAD BEHAVIORAL FEATURES
 # ============================================================
 
 try:
@@ -537,7 +500,7 @@ except Exception as error:
 
 
 # ============================================================
-# BUILD LOOKUP TABLES
+# BUILD LOOKUPS
 # ============================================================
 
 anomaly_lookup = {
@@ -547,10 +510,8 @@ anomaly_lookup = {
             "",
         )
     ): item
-    for item
-    in anomaly_results
+    for item in anomaly_results
 }
-
 
 suspicious_lookup = {
     str(
@@ -559,13 +520,12 @@ suspicious_lookup = {
             "",
         )
     )
-    for item
-    in suspicious_agents
+    for item in suspicious_agents
 }
 
 
 # ============================================================
-# BUILD INTEGRATED AGENT INTELLIGENCE
+# BUILD AGENT INTELLIGENCE
 # ============================================================
 
 intelligence_records = []
@@ -587,7 +547,7 @@ intelligence_df = pd.DataFrame(
 
 
 # ============================================================
-# DAY 20 — SECURITY OVERVIEW
+# DAY 16 — SECURITY OVERVIEW
 # ============================================================
 
 if show_overview:
@@ -596,21 +556,17 @@ if show_overview:
         "📊 Security Overview"
     )
 
-    overview_1, overview_2, overview_3, overview_4, overview_5 = (
+    col1, col2, col3, col4, col5 = (
         st.columns(5)
     )
 
-
-    with overview_1:
-
+    with col1:
         st.metric(
             "Total Events",
             total_events,
         )
 
-
-    with overview_2:
-
+    with col2:
         st.metric(
             "Allowed",
             decisions.get(
@@ -619,9 +575,7 @@ if show_overview:
             ),
         )
 
-
-    with overview_3:
-
+    with col3:
         st.metric(
             "Denied",
             decisions.get(
@@ -630,9 +584,7 @@ if show_overview:
             ),
         )
 
-
-    with overview_4:
-
+    with col4:
         st.metric(
             "Average Risk",
             risk.get(
@@ -641,9 +593,7 @@ if show_overview:
             ),
         )
 
-
-    with overview_5:
-
+    with col5:
         st.metric(
             "Critical Events",
             risk.get(
@@ -652,16 +602,13 @@ if show_overview:
             ),
         )
 
-
     st.divider()
 
-    risk_1, risk_2, risk_3, risk_4 = (
+    risk1, risk2, risk3, risk4 = (
         st.columns(4)
     )
 
-
-    with risk_1:
-
+    with risk1:
         st.metric(
             "Maximum Risk",
             risk.get(
@@ -670,9 +617,7 @@ if show_overview:
             ),
         )
 
-
-    with risk_2:
-
+    with risk2:
         st.metric(
             "High-Risk Events",
             risk.get(
@@ -681,9 +626,7 @@ if show_overview:
             ),
         )
 
-
-    with risk_3:
-
+    with risk3:
         st.metric(
             "Suspicious Agents",
             len(
@@ -691,23 +634,19 @@ if show_overview:
             ),
         )
 
-
-    with risk_4:
-
+    with risk4:
         st.metric(
-            "Repeated Denial Patterns",
+            "Repeated Denials",
             len(
                 repeated_denials
             ),
         )
 
-
-    chart_1, chart_2 = (
+    chart1, chart2 = (
         st.columns(2)
     )
 
-
-    with chart_1:
+    with chart1:
 
         st.subheader(
             "Authorization Decisions"
@@ -733,8 +672,7 @@ if show_overview:
                 width="stretch",
             )
 
-
-    with chart_2:
+    with chart2:
 
         st.subheader(
             "Risk Indicators"
@@ -790,16 +728,11 @@ if show_intelligence:
     )
 
     st.caption(
-        "Unified prioritization of agent security behavior "
-        "using authorization, risk, behavioral and anomaly signals."
+        "Unified prioritization using authorization, "
+        "risk, behavioral and anomaly signals."
     )
 
-
     if not intelligence_df.empty:
-
-        # ----------------------------------------------------
-        # INTELLIGENCE SUMMARY
-        # ----------------------------------------------------
 
         critical_count = int(
             (
@@ -810,7 +743,6 @@ if show_intelligence:
             ).sum()
         )
 
-
         high_count = int(
             (
                 intelligence_df[
@@ -819,7 +751,6 @@ if show_intelligence:
                 == "HIGH"
             ).sum()
         )
-
 
         medium_count = int(
             (
@@ -830,7 +761,6 @@ if show_intelligence:
             ).sum()
         )
 
-
         low_count = int(
             (
                 intelligence_df[
@@ -839,7 +769,6 @@ if show_intelligence:
                 == "LOW"
             ).sum()
         )
-
 
         avg_intelligence = round(
             float(
@@ -850,60 +779,43 @@ if show_intelligence:
             2,
         )
 
-
-        intelligence_1, intelligence_2, intelligence_3, intelligence_4, intelligence_5 = (
+        i1, i2, i3, i4, i5 = (
             st.columns(5)
         )
 
-
-        with intelligence_1:
-
+        with i1:
             st.metric(
-                "Avg Intelligence Score",
+                "Avg Intelligence",
                 avg_intelligence,
             )
 
-
-        with intelligence_2:
-
+        with i2:
             st.metric(
                 "Critical",
                 critical_count,
             )
 
-
-        with intelligence_3:
-
+        with i3:
             st.metric(
                 "High",
                 high_count,
             )
 
-
-        with intelligence_4:
-
+        with i4:
             st.metric(
                 "Medium",
                 medium_count,
             )
 
-
-        with intelligence_5:
-
+        with i5:
             st.metric(
                 "Low",
                 low_count,
             )
 
-
-        # ----------------------------------------------------
-        # PRIORITIZATION TABLE
-        # ----------------------------------------------------
-
         st.subheader(
             "Agent Security Prioritization"
         )
-
 
         prioritization_columns = [
             "agent_id",
@@ -916,7 +828,6 @@ if show_intelligence:
             "total_requests",
             "recommended_action",
         ]
-
 
         prioritization_df = (
             intelligence_df[
@@ -934,22 +845,15 @@ if show_intelligence:
             )
         )
 
-
         st.dataframe(
             prioritization_df,
             width="stretch",
             hide_index=True,
         )
 
-
-        # ----------------------------------------------------
-        # INTELLIGENCE SCORE
-        # ----------------------------------------------------
-
         st.subheader(
             "Unified Intelligence Score"
         )
-
 
         score_chart = (
             intelligence_df[
@@ -967,66 +871,17 @@ if show_intelligence:
             )
         )
 
-
         st.bar_chart(
             score_chart,
             width="stretch",
         )
 
-
-        # ----------------------------------------------------
-        # SIGNAL CONTRIBUTION
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Security Signal Composition"
-        )
-
-
-        signal_df = intelligence_df[
-            [
-                "agent_id",
-                "maximum_risk",
-                "denial_rate",
-                "anomaly_score",
-            ]
-        ].copy()
-
-
-        signal_df = signal_df.rename(
-            columns={
-                "maximum_risk": "Risk Signal",
-                "denial_rate": "Denial Signal",
-                "anomaly_score": "Anomaly Signal",
-            }
-        )
-
-
-        signal_df = (
-            signal_df
-            .set_index(
-                "agent_id"
-            )
-        )
-
-
-        st.dataframe(
-            signal_df,
-            width="stretch",
-        )
-
-
-        # ----------------------------------------------------
-        # PRIORITY FILTER
-        # ----------------------------------------------------
-
         st.subheader(
             "Priority Investigation Queue"
         )
 
-
         selected_priority = st.selectbox(
-            "Select Priority",
+            "Priority",
             [
                 "ALL",
                 "CRITICAL",
@@ -1034,9 +889,8 @@ if show_intelligence:
                 "MEDIUM",
                 "LOW",
             ],
-            key="selected_priority",
+            key="day20_priority",
         )
-
 
         if selected_priority == "ALL":
 
@@ -1055,7 +909,6 @@ if show_intelligence:
                 ]
             )
 
-
         if not priority_df.empty:
 
             st.dataframe(
@@ -1067,72 +920,476 @@ if show_intelligence:
         else:
 
             st.info(
-                "No agents currently match the selected priority."
+                "No agents match the selected priority."
             )
 
-
-        # ----------------------------------------------------
-        # SECURITY RECOMMENDATIONS
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Security Response Recommendations"
-        )
-
-
-        critical_agents = (
-            intelligence_df[
-                intelligence_df[
-                    "priority"
-                ]
-                == "CRITICAL"
-            ]
-        )
-
-
-        high_agents = (
-            intelligence_df[
-                intelligence_df[
-                    "priority"
-                ]
-                == "HIGH"
-            ]
-        )
-
-
-        if not critical_agents.empty:
+        if critical_count > 0:
 
             st.error(
-                f"{len(critical_agents)} agent(s) require "
-                "immediate investigation and containment review."
+                f"{critical_count} critical agent(s) "
+                "require immediate investigation."
             )
 
-
-        elif not high_agents.empty:
+        elif high_count > 0:
 
             st.warning(
-                f"{len(high_agents)} agent(s) require "
-                "prioritized analyst investigation."
+                f"{high_count} high-priority agent(s) "
+                "require analyst investigation."
             )
-
 
         else:
 
             st.success(
                 "No critical or high-priority agent behavior "
-                "is currently identified by the integrated baseline."
+                "is currently identified."
             )
 
+
+# ============================================================
+# DAY 21 — CONTROLLED SECURITY SCENARIO LAB
+# ============================================================
+
+if show_scenarios:
+
+    st.divider()
+
+    st.header(
+        "🧪 Controlled Security Scenario Lab"
+    )
+
+    st.caption(
+        "Reproducible benign, suspicious and malicious "
+        "scenarios for controlled security experiments."
+    )
+
+    # --------------------------------------------------------
+    # SCENARIO SUMMARY
+    # --------------------------------------------------------
+
+    try:
+
+        scenario_summary = (
+            get_scenario_summary()
+        )
+
+    except Exception as error:
+
+        st.error(
+            "Unable to load scenario framework: "
+            f"{error}"
+        )
+
+        scenario_summary = {
+            "total": 0,
+            "benign": 0,
+            "suspicious": 0,
+            "malicious": 0,
+        }
+
+    s1, s2, s3, s4 = (
+        st.columns(4)
+    )
+
+    with s1:
+
+        st.metric(
+            "Total Scenarios",
+            scenario_summary.get(
+                "total",
+                0,
+            ),
+        )
+
+    with s2:
+
+        st.metric(
+            "Benign",
+            scenario_summary.get(
+                "benign",
+                0,
+            ),
+        )
+
+    with s3:
+
+        st.metric(
+            "Suspicious",
+            scenario_summary.get(
+                "suspicious",
+                0,
+            ),
+        )
+
+    with s4:
+
+        st.metric(
+            "Malicious",
+            scenario_summary.get(
+                "malicious",
+                0,
+            ),
+        )
+
+    # --------------------------------------------------------
+    # SCENARIO CLASSIFICATION
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Scenario Catalog"
+    )
+
+    scenario_filter = st.selectbox(
+        "Scenario Class",
+        [
+            "ALL",
+            BENIGN,
+            SUSPICIOUS,
+            MALICIOUS,
+        ],
+        key="day21_scenario_filter",
+    )
+
+    if scenario_filter == "ALL":
+
+        scenarios = (
+            get_scenario_catalog()
+        )
+
+    else:
+
+        scenarios = (
+            get_scenarios(
+                scenario_filter
+            )
+        )
+
+    if scenarios:
+
+        scenario_df = pd.DataFrame(
+            scenarios
+        )
+
+        display_columns = [
+            "scenario_id",
+            "scenario_type",
+            "agent_id",
+            "task_id",
+            "action",
+            "resource",
+            "expected_behavior",
+        ]
+
+        display_columns = [
+            column
+            for column
+            in display_columns
+            if column
+            in scenario_df.columns
+        ]
+
+        st.dataframe(
+            scenario_df[
+                display_columns
+            ],
+            width="stretch",
+            hide_index=True,
+        )
 
     else:
 
         st.info(
-            "Integrated intelligence requires agent activity data."
+            "No scenarios match the selected class."
         )
+
+    # --------------------------------------------------------
+    # SCENARIO INVESTIGATION
+    # --------------------------------------------------------
+
+    if scenarios:
+
+        st.subheader(
+            "Scenario Investigation"
+        )
+
+        scenario_ids = [
+            scenario[
+                "scenario_id"
+            ]
+            for scenario
+            in scenarios
+        ]
+
+        selected_scenario_id = (
+            st.selectbox(
+                "Select Scenario",
+                scenario_ids,
+                key="day21_selected_scenario",
+            )
+        )
+
+        selected_scenario = next(
+            (
+                scenario
+                for scenario
+                in scenarios
+                if scenario[
+                    "scenario_id"
+                ]
+                == selected_scenario_id
+            ),
+            None,
+        )
+
+        if selected_scenario:
+
+            detail1, detail2 = (
+                st.columns(2)
+            )
+
+            with detail1:
+
+                st.markdown(
+                    "### Scenario Definition"
+                )
+
+                st.write(
+                    "**Scenario ID:** "
+                    f"`{selected_scenario['scenario_id']}`"
+                )
+
+                st.write(
+                    "**Class:** "
+                    f"`{selected_scenario['scenario_type']}`"
+                )
+
+                st.write(
+                    "**Agent:** "
+                    f"`{selected_scenario['agent_id']}`"
+                )
+
+                st.write(
+                    "**Task:** "
+                    f"`{selected_scenario['task_id']}`"
+                )
+
+            with detail2:
+
+                st.markdown(
+                    "### Requested Operation"
+                )
+
+                st.write(
+                    "**Action:** "
+                    f"`{selected_scenario['action']}`"
+                )
+
+                st.write(
+                    "**Resource:** "
+                    f"`{selected_scenario['resource']}`"
+                )
+
+                st.write(
+                    "**Expected Decision:** "
+                    f"`{selected_scenario['expected_behavior']}`"
+                )
+
+            st.info(
+                selected_scenario.get(
+                    "description",
+                    "No description available.",
+                )
+            )
+
+    # --------------------------------------------------------
+    # REPRODUCIBLE EXPERIMENT SAMPLER
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Reproducible Experiment Sampler"
+    )
+
+    sampler1, sampler2 = (
+        st.columns(2)
+    )
+
+    with sampler1:
+
+        sample_count = st.number_input(
+            "Number of Scenarios",
+            min_value=1,
+            max_value=50,
+            value=9,
+            step=1,
+            key="day21_sample_count",
+        )
+
+    with sampler2:
+
+        random_seed = st.number_input(
+            "Experiment Seed",
+            min_value=0,
+            max_value=999999,
+            value=42,
+            step=1,
+            key="day21_seed",
+        )
+
+    if st.button(
+        "🎲 Generate Reproducible Scenario Set",
+        key="day21_generate_scenarios",
+        type="primary",
+    ):
+
+        try:
+
+            sampled = sample_scenarios(
+                count=int(
+                    sample_count
+                ),
+                seed=int(
+                    random_seed
+                ),
+            )
+
+            sampled_df = pd.DataFrame(
+                sampled
+            )
+
+            st.session_state[
+                "day21_sampled_scenarios"
+            ] = sampled_df
+
+            st.success(
+                "Reproducible scenario set generated."
+            )
+
+        except Exception as error:
+
+            st.error(
+                "Unable to generate scenario set: "
+                f"{error}"
+            )
+
+    if (
+        st.session_state[
+            "day21_sampled_scenarios"
+        ]
+        is not None
+    ):
+
+        st.subheader(
+            "Generated Experimental Dataset"
+        )
+
+        st.dataframe(
+            st.session_state[
+                "day21_sampled_scenarios"
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+        csv_data = (
+            st.session_state[
+                "day21_sampled_scenarios"
+            ]
+            .to_csv(
+                index=False
+            )
+            .encode(
+                "utf-8"
+            )
+        )
+
+        st.download_button(
+            "⬇️ Export Scenario Dataset",
+            data=csv_data,
+            file_name=(
+                "aegisguard_day21_scenarios.csv"
+            ),
+            mime="text/csv",
+        )
+
+    # --------------------------------------------------------
+    # SCENARIO DISTRIBUTION
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Scenario Distribution"
+    )
+
+    distribution_df = pd.DataFrame(
+        {
+            "Scenario Type": [
+                "Benign",
+                "Suspicious",
+                "Malicious",
+            ],
+            "Count": [
+                scenario_summary.get(
+                    "benign",
+                    0,
+                ),
+                scenario_summary.get(
+                    "suspicious",
+                    0,
+                ),
+                scenario_summary.get(
+                    "malicious",
+                    0,
+                ),
+            ],
+        }
+    )
+
+    st.bar_chart(
+        distribution_df.set_index(
+            "Scenario Type"
+        ),
+        width="stretch",
+    )
+
+    # --------------------------------------------------------
+    # RESEARCH METHODOLOGY
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Experimental Methodology"
+    )
+
+    st.markdown(
+        """
+        **Benign scenarios**
+
+        Represent expected and authorized agent behavior.
+
+        **Suspicious scenarios**
+
+        Represent behavior that violates normal access
+        expectations or behavioral patterns.
+
+        **Malicious scenarios**
+
+        Represent controlled unauthorized actions used
+        to evaluate AegisGuard's security controls.
+
+        **Reproducibility**
+
+        Every generated scenario set uses an explicit
+        random seed. The same seed produces the same
+        scenario selection.
+
+        **Research purpose**
+
+        The controlled scenario framework establishes
+        labeled experimental cases for the evaluation
+        phase beginning with Days 22–30.
+        """
+    )
 
 
 # ============================================================
-# DAY 19 — ANOMALY DETECTION
+# DAY 19 — BEHAVIORAL ANOMALY DETECTION
 # ============================================================
 
 if show_anomalies:
@@ -1143,13 +1400,11 @@ if show_anomalies:
         "🚨 Behavioral Anomaly Detection"
     )
 
-
-    anomaly_1, anomaly_2, anomaly_3, anomaly_4 = (
+    a1, a2, a3, a4 = (
         st.columns(4)
     )
 
-
-    with anomaly_1:
+    with a1:
 
         st.metric(
             "Agents Analyzed",
@@ -1159,8 +1414,7 @@ if show_anomalies:
             ),
         )
 
-
-    with anomaly_2:
+    with a2:
 
         st.metric(
             "High Anomaly",
@@ -1170,8 +1424,7 @@ if show_anomalies:
             ),
         )
 
-
-    with anomaly_3:
+    with a3:
 
         st.metric(
             "Medium Anomaly",
@@ -1181,8 +1434,7 @@ if show_anomalies:
             ),
         )
 
-
-    with anomaly_4:
+    with a4:
 
         st.metric(
             "Normal",
@@ -1191,7 +1443,6 @@ if show_anomalies:
                 0,
             ),
         )
-
 
     if anomaly_results:
 
@@ -1221,8 +1472,7 @@ if show_anomalies:
                                 "denial_rate",
                                 0,
                             )
-                        )
-                        * 100,
+                        ) * 100,
                         2,
                     ),
                     "Average Risk": safe_float(
@@ -1240,11 +1490,9 @@ if show_anomalies:
                 }
             )
 
-
         anomaly_df = pd.DataFrame(
             anomaly_rows
         )
-
 
         st.dataframe(
             anomaly_df,
@@ -1252,11 +1500,9 @@ if show_anomalies:
             hide_index=True,
         )
 
-
         st.subheader(
             "Anomaly Score Distribution"
         )
-
 
         st.bar_chart(
             anomaly_df[
@@ -1264,8 +1510,7 @@ if show_anomalies:
                     "Agent",
                     "Anomaly Score",
                 ]
-            ]
-            .set_index(
+            ].set_index(
                 "Agent"
             ),
             width="stretch",
@@ -1273,7 +1518,7 @@ if show_anomalies:
 
 
 # ============================================================
-# DAY 18 — BEHAVIORAL FEATURES
+# DAY 18 — BEHAVIORAL FEATURE ANALYTICS
 # ============================================================
 
 if show_features:
@@ -1284,20 +1529,17 @@ if show_features:
         "🧠 Behavioral Feature Analytics"
     )
 
-
     if behavioral_features:
 
         behavior_df = pd.DataFrame(
             behavioral_features
         )
 
-
-        feature_1, feature_2, feature_3 = (
+        f1, f2, f3 = (
             st.columns(3)
         )
 
-
-        with feature_1:
+        with f1:
 
             st.metric(
                 "Agents Profiled",
@@ -1306,8 +1548,7 @@ if show_features:
                 ),
             )
 
-
-        with feature_2:
+        with f2:
 
             if (
                 "average_risk"
@@ -1326,8 +1567,7 @@ if show_features:
                     ),
                 )
 
-
-        with feature_3:
+        with f3:
 
             if (
                 "denial_rate"
@@ -1348,11 +1588,9 @@ if show_features:
                     high_denial,
                 )
 
-
         st.subheader(
             "Behavioral Feature Matrix"
         )
-
 
         st.dataframe(
             behavior_df,
@@ -1360,47 +1598,58 @@ if show_features:
             hide_index=True,
         )
 
+        try:
 
-        available_features = [
-            feature
-            for feature
-            in get_behavior_feature_names()
-            if feature
-            in behavior_df.columns
-        ]
+            available_features = [
+                feature
+                for feature
+                in get_behavior_feature_names()
+                if feature
+                in behavior_df.columns
+            ]
 
+        except Exception:
+
+            available_features = [
+                column
+                for column
+                in behavior_df.columns
+                if column
+                != "agent_id"
+            ]
 
         if available_features:
 
-            selected_feature = st.selectbox(
-                "Explore Feature",
-                available_features,
-                key="day20_feature_explorer",
+            selected_feature = (
+                st.selectbox(
+                    "Explore Feature",
+                    available_features,
+                    key="day21_feature_explorer",
+                )
             )
 
+            if "agent_id" in behavior_df.columns:
 
-            feature_chart = (
-                behavior_df[
-                    [
-                        "agent_id",
-                        selected_feature,
+                feature_chart = (
+                    behavior_df[
+                        [
+                            "agent_id",
+                            selected_feature,
+                        ]
                     ]
-                ]
-                .set_index(
-                    "agent_id"
+                    .set_index(
+                        "agent_id"
+                    )
+                    .sort_values(
+                        by=selected_feature,
+                        ascending=False,
+                    )
                 )
-                .sort_values(
-                    by=selected_feature,
-                    ascending=False,
+
+                st.bar_chart(
+                    feature_chart,
+                    width="stretch",
                 )
-            )
-
-
-            st.bar_chart(
-                feature_chart,
-                width="stretch",
-            )
-
 
     else:
 
@@ -1410,7 +1659,7 @@ if show_features:
 
 
 # ============================================================
-# DAY 17 — INVESTIGATION ENGINE
+# DAY 17 — SECURITY INVESTIGATION ENGINE
 # ============================================================
 
 if show_investigation:
@@ -1422,10 +1671,9 @@ if show_investigation:
     )
 
     st.caption(
-        "Use this layer to investigate events surfaced "
-        "by the integrated intelligence pipeline."
+        "Investigate individual events and retrieve "
+        "supporting security evidence."
     )
-
 
     try:
 
@@ -1437,18 +1685,14 @@ if show_investigation:
 
         filter_options = {
             "agents": [],
-            "tasks": [],
             "actions": [],
-            "resources": [],
         }
 
-
-    investigation_1, investigation_2, investigation_3 = (
+    inv1, inv2, inv3 = (
         st.columns(3)
     )
 
-
-    with investigation_1:
+    with inv1:
 
         selected_agent = st.selectbox(
             "Agent",
@@ -1459,11 +1703,10 @@ if show_investigation:
                 "agents",
                 [],
             ),
-            key="day20_investigation_agent",
+            key="investigation_agent",
         )
 
-
-    with investigation_2:
+    with inv2:
 
         selected_action = st.selectbox(
             "Action",
@@ -1474,11 +1717,10 @@ if show_investigation:
                 "actions",
                 [],
             ),
-            key="day20_investigation_action",
+            key="investigation_action",
         )
 
-
-    with investigation_3:
+    with inv3:
 
         selected_decision = st.selectbox(
             "Decision",
@@ -1487,16 +1729,14 @@ if show_investigation:
                 "ALLOW",
                 "DENY",
             ],
-            key="day20_investigation_decision",
+            key="investigation_decision",
         )
 
-
-    investigation_button, reset_button = (
+    run_col, clear_col = (
         st.columns(2)
     )
 
-
-    with investigation_button:
+    with run_col:
 
         run_investigation = st.button(
             "🔍 Investigate Events",
@@ -1504,16 +1744,14 @@ if show_investigation:
             type="primary",
         )
 
+    with clear_col:
 
-    with reset_button:
-
-        reset_investigation = st.button(
+        clear_investigation = st.button(
             "↺ Clear Results",
             width="stretch",
         )
 
-
-    if reset_investigation:
+    if clear_investigation:
 
         st.session_state.investigation_results = []
 
@@ -1521,36 +1759,30 @@ if show_investigation:
 
         st.rerun()
 
-
     if run_investigation:
 
         try:
 
             results = (
                 get_investigation_events(
-
                     agent_id=(
                         None
                         if selected_agent == "ALL"
                         else selected_agent
                     ),
-
                     action=(
                         None
                         if selected_action == "ALL"
                         else selected_action
                     ),
-
                     decision=(
                         None
                         if selected_decision == "ALL"
                         else selected_decision
                     ),
-
                     limit=100,
                 )
             )
-
 
             st.session_state.investigation_results = (
                 results
@@ -1560,35 +1792,30 @@ if show_investigation:
                 True
             )
 
-
         except Exception as error:
 
             st.error(
                 f"Investigation failed: {error}"
             )
 
-
     if st.session_state.investigation_executed:
 
-        investigation_results = (
+        results = (
             st.session_state.investigation_results
         )
 
-
-        if investigation_results:
+        if results:
 
             investigation_df = pd.DataFrame(
-                investigation_results
+                results
             )
-
 
             st.metric(
                 "Matching Events",
                 len(
-                    investigation_results
+                    results
                 ),
             )
-
 
             st.dataframe(
                 investigation_df,
@@ -1596,15 +1823,16 @@ if show_investigation:
                 hide_index=True,
             )
 
-
             event_ids = [
-                event.get("id")
+                event.get(
+                    "id"
+                )
                 for event
-                in investigation_results
-                if event.get("id")
-                is not None
+                in results
+                if event.get(
+                    "id"
+                ) is not None
             ]
-
 
             if event_ids:
 
@@ -1612,16 +1840,13 @@ if show_investigation:
                     "Selected Event Evidence"
                 )
 
-
                 selected_event_id = st.selectbox(
                     "Event ID",
                     event_ids,
-                    key="day20_selected_event",
+                    key="selected_investigation_event",
                 )
 
-
                 selected_event = None
-
 
                 try:
 
@@ -1639,7 +1864,6 @@ if show_investigation:
                         "Unable to retrieve event: "
                         f"{error}"
                     )
-
 
                 if selected_event:
 
@@ -1669,18 +1893,15 @@ if show_investigation:
                             }
                         )
 
-
                     evidence_df = pd.DataFrame(
                         evidence_rows
                     )
-
 
                     st.dataframe(
                         evidence_df,
                         width="stretch",
                         hide_index=True,
                     )
-
 
         else:
 
@@ -1701,20 +1922,17 @@ if show_agents:
         "👤 Agent Intelligence"
     )
 
-
     if agents:
 
         agent_df = pd.DataFrame(
             agents
         )
 
-
         st.dataframe(
             agent_df,
             width="stretch",
             hide_index=True,
         )
-
 
         if {
             "total_requests",
@@ -1723,33 +1941,27 @@ if show_agents:
             agent_df.columns
         ):
 
-            agent_chart_df = agent_df[
-                [
-                    "agent_id",
-                    "total_requests",
-                    "denied_requests",
+            activity_df = (
+                agent_df[
+                    [
+                        "agent_id",
+                        "total_requests",
+                        "denied_requests",
+                    ]
                 ]
-            ].copy()
-
-
-            agent_chart_df = (
-                agent_chart_df
                 .set_index(
                     "agent_id"
                 )
             )
 
-
             st.subheader(
-                "Request Activity"
+                "Agent Request Activity"
             )
-
 
             st.bar_chart(
-                agent_chart_df,
+                activity_df,
                 width="stretch",
             )
-
 
     else:
 
@@ -1770,20 +1982,17 @@ if show_high_risk:
         "🔥 High-Risk Security Events"
     )
 
-
     if high_risk_events:
 
         high_risk_df = pd.DataFrame(
             high_risk_events
         )
 
-
         st.dataframe(
             high_risk_df,
             width="stretch",
             hide_index=True,
         )
-
 
     else:
 
@@ -1793,25 +2002,24 @@ if show_high_risk:
 
 
 # ============================================================
-# SECURITY INTELLIGENCE ARCHITECTURE
+# SECURITY ARCHITECTURE
 # ============================================================
 
 st.divider()
 
 st.header(
-    "🏗️ AegisGuard Intelligence Architecture"
+    "🏗️ AegisGuard Security Research Architecture"
 )
 
-architecture_col_1, architecture_col_2 = (
+architecture1, architecture2 = (
     st.columns(2)
 )
 
-
-with architecture_col_1:
+with architecture1:
 
     st.markdown(
         """
-        ### Enforcement Layer
+        ### Enforcement & Telemetry
 
         **Agent Request**
 
@@ -1833,18 +2041,17 @@ with architecture_col_1:
 
         ↓
 
-        **Audit Event**
+        **Security Telemetry**
         """
     )
 
-
-with architecture_col_2:
+with architecture2:
 
     st.markdown(
         """
-        ### Intelligence Layer
+        ### Research Intelligence
 
-        **Audit Events**
+        **Security Telemetry**
 
         ↓
 
@@ -1856,73 +2063,95 @@ with architecture_col_2:
 
         ↓
 
-        **Agent Intelligence Score**
+        **Integrated Intelligence**
 
         ↓
 
-        **Priority Classification**
+        **Controlled Scenarios**
 
         ↓
 
-        **Investigation Queue**
+        **Experimental Evaluation**
         """
     )
 
 
 # ============================================================
-# DAY 20 RESEARCH CONTRIBUTION
+# DAY 21 RESEARCH MILESTONE
 # ============================================================
 
 st.divider()
 
 st.header(
-    "🔬 Day 20 Research Contribution"
+    "🔬 Day 21 Research Milestone"
 )
 
 st.markdown(
     """
-    ### Integrated Security Intelligence
+    ### Controlled Security Scenario Framework
 
-    AegisGuard now combines multiple security signals
-    into an analyst-oriented intelligence layer.
+    Day 21 introduces a reproducible experimental layer
+    to AegisGuard.
 
-    **1. Authorization Signal**
+    The framework separates controlled behaviors into:
 
-    Whether an agent's request was permitted or denied.
+    **BENIGN**
 
-    **2. Risk Signal**
+    Expected and authorized agent behavior.
 
-    The contextual risk associated with observed activity.
+    **SUSPICIOUS**
 
-    **3. Behavioral Signal**
+    Behavior that deviates from expected access patterns.
 
-    Agent-level behavior represented through engineered
-    statistical features.
+    **MALICIOUS**
 
-    **4. Anomaly Signal**
+    Controlled unauthorized behavior designed to test
+    security enforcement and detection.
 
-    Deviation of observed behavior from the behavioral
-    baseline.
+    Each scenario contains a defined agent, task, action,
+    resource and expected security decision.
 
-    **5. Suspicion Signal**
+    A deterministic random seed allows experiments to be
+    reproduced using the same scenario selection.
 
-    Existing behavioral security classifications.
+    This framework establishes the experimental foundation
+    for Days 22–30, where detection performance can be
+    evaluated using measurable security metrics.
+    """
+)
 
-    **6. Intelligence Score**
 
-    A bounded prioritization score combining the above
-    signals for analyst triage.
+# ============================================================
+# RESEARCH METHODOLOGY
+# ============================================================
 
-    **7. Investigation**
+st.subheader(
+    "Experimental Research Pipeline"
+)
 
-    High-priority agents can be traced back to individual
-    security events and evidence.
-
-    This creates a complete analytical path from:
-
-    **Agent Request → Enforcement → Telemetry →
-    Behavioral Analysis → Anomaly Detection →
-    Intelligence → Investigation**
+st.markdown(
+    """
+    ```text
+    Controlled Scenario
+            ↓
+    AegisGuard Security Engine
+            ↓
+    Authorization Decision
+            ↓
+    Risk Assessment
+            ↓
+    Security Telemetry
+            ↓
+    Behavioral Features
+            ↓
+    Anomaly Detection
+            ↓
+    Intelligence Prioritization
+            ↓
+    Investigation Evidence
+            ↓
+    Experimental Evaluation
+    ```
     """
 )
 
@@ -1932,11 +2161,11 @@ st.markdown(
 # ============================================================
 
 st.warning(
-    "Research limitation: the integrated intelligence score "
-    "is a transparent prioritization baseline, not a validated "
-    "production threat score. Its weights and thresholds must "
-    "be experimentally evaluated against controlled datasets "
-    "before making security-performance claims."
+    "Research limitation: the Day 21 scenarios are "
+    "controlled synthetic test cases. They should not be "
+    "presented as evidence of real-world attack detection "
+    "until they are evaluated against appropriately designed "
+    "datasets and experiments."
 )
 
 
@@ -1952,5 +2181,5 @@ st.caption(
 )
 
 st.caption(
-    "Research Prototype • Day 20 • Integrated Security Intelligence"
+    "Research Prototype • Day 21 • Controlled Security Scenarios"
 )

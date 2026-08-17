@@ -5,7 +5,7 @@ import pandas as pd
 
 
 # ============================================================
-# CORE SECURITY ANALYTICS
+# AEGISGUARD CORE ANALYTICS
 # ============================================================
 
 from app.analytics import (
@@ -28,7 +28,7 @@ from app.behavior import (
 
 
 # ============================================================
-# INVESTIGATION
+# INVESTIGATION ENGINE
 # ============================================================
 
 from app.investigation import (
@@ -58,7 +58,7 @@ from app.anomaly import (
 
 
 # ============================================================
-# DAY 21 — CONTROLLED SCENARIOS
+# CONTROLLED SCENARIOS
 # ============================================================
 
 from app.scenarios import (
@@ -72,7 +72,7 @@ from app.scenarios import (
 
 
 # ============================================================
-# DAY 22 — ATTACK SCENARIOS
+# ATTACK SCENARIOS
 # ============================================================
 
 from app.attack_scenarios import (
@@ -84,7 +84,7 @@ from app.attack_scenarios import (
 
 
 # ============================================================
-# DAY 23 — EXPERIMENTAL DATASET
+# EXPERIMENTAL DATASET
 # ============================================================
 
 from app.experimental_dataset import (
@@ -95,6 +95,20 @@ from app.experimental_dataset import (
     dataset_to_csv,
     dataset_to_jsonl,
     validate_dataset,
+)
+
+
+# ============================================================
+# DAY 25 — RESEARCH EVALUATION ENGINE
+# ============================================================
+
+from app.evaluation import (
+    compare_detectors,
+    build_baseline_sweep,
+    build_aegisguard_sweep,
+    get_best_threshold,
+    get_confusion_matrix,
+    generate_comparison_summary,
 )
 
 
@@ -114,322 +128,53 @@ st.set_page_config(
 # SESSION STATE
 # ============================================================
 
-if "day23_dataset" not in st.session_state:
-    st.session_state.day23_dataset = None
+DEFAULT_STATE = {
+    "day23_dataset": None,
+    "day23_summary": None,
+    "day23_validation": None,
+    "investigation_results": [],
+    "investigation_executed": False,
+    "day25_baseline": None,
+    "day25_aegisguard": None,
+    "day25_comparison": None,
+}
 
-if "day23_summary" not in st.session_state:
-    st.session_state.day23_summary = None
 
-if "day23_validation" not in st.session_state:
-    st.session_state.day23_validation = None
+for key, value in DEFAULT_STATE.items():
 
-if "investigation_results" not in st.session_state:
-    st.session_state.investigation_results = []
+    if key not in st.session_state:
 
-if "investigation_executed" not in st.session_state:
-    st.session_state.investigation_executed = False
+        st.session_state[key] = value
 
 
 # ============================================================
-# HELPER FUNCTIONS
+# HELPERS
 # ============================================================
 
-def safe_int(value, default=0):
+def safe_int(
+    value,
+    default=0,
+):
 
     try:
         return int(value)
 
     except (TypeError, ValueError):
+
         return default
 
 
-def safe_float(value, default=0.0):
+def safe_float(
+    value,
+    default=0.0,
+):
 
     try:
         return float(value)
 
     except (TypeError, ValueError):
+
         return default
-
-
-def calculate_binary_metrics(
-    actual_positive,
-    actual_negative,
-    predicted_positive,
-    predicted_negative,
-):
-    """
-    Calculate standard binary classification metrics.
-
-    Positive class:
-        MALICIOUS
-
-    Negative class:
-        NON-MALICIOUS
-        (BENIGN + SUSPICIOUS)
-    """
-
-    tp = sum(
-        1
-        for actual, predicted in zip(
-            actual_positive,
-            predicted_positive,
-        )
-        if actual and predicted
-    )
-
-    tn = sum(
-        1
-        for actual, predicted in zip(
-            actual_negative,
-            predicted_negative,
-        )
-        if actual and predicted
-    )
-
-    fp = sum(
-        1
-        for actual, predicted in zip(
-            actual_negative,
-            predicted_positive,
-        )
-        if actual and predicted
-    )
-
-    fn = sum(
-        1
-        for actual, predicted in zip(
-            actual_positive,
-            predicted_negative,
-        )
-        if actual and predicted
-    )
-
-    total = (
-        tp + tn + fp + fn
-    )
-
-    accuracy = (
-        (tp + tn) / total
-        if total
-        else 0.0
-    )
-
-    precision = (
-        tp / (tp + fp)
-        if (tp + fp)
-        else 0.0
-    )
-
-    recall = (
-        tp / (tp + fn)
-        if (tp + fn)
-        else 0.0
-    )
-
-    specificity = (
-        tn / (tn + fp)
-        if (tn + fp)
-        else 0.0
-    )
-
-    f1 = (
-        2
-        * precision
-        * recall
-        / (precision + recall)
-        if (precision + recall)
-        else 0.0
-    )
-
-    false_positive_rate = (
-        fp / (fp + tn)
-        if (fp + tn)
-        else 0.0
-    )
-
-    false_negative_rate = (
-        fn / (fn + tp)
-        if (fn + tp)
-        else 0.0
-    )
-
-    return {
-        "true_positive": tp,
-        "true_negative": tn,
-        "false_positive": fp,
-        "false_negative": fn,
-        "accuracy": round(
-            accuracy,
-            4,
-        ),
-        "precision": round(
-            precision,
-            4,
-        ),
-        "recall": round(
-            recall,
-            4,
-        ),
-        "specificity": round(
-            specificity,
-            4,
-        ),
-        "f1_score": round(
-            f1,
-            4,
-        ),
-        "false_positive_rate": round(
-            false_positive_rate,
-            4,
-        ),
-        "false_negative_rate": round(
-            false_negative_rate,
-            4,
-        ),
-    }
-
-
-def evaluate_dataset(
-    dataset,
-    threshold,
-    prediction_mode,
-):
-    """
-    Evaluate AegisGuard's synthetic detection signal.
-
-    Actual positive:
-        ground_truth == MALICIOUS
-
-    Predicted positive:
-        depends on prediction_mode
-    """
-
-    actual_positive = []
-    actual_negative = []
-    predicted_positive = []
-    predicted_negative = []
-
-    for event in dataset:
-
-        ground_truth = str(
-            event.get(
-                "ground_truth",
-                "",
-            )
-        ).upper()
-
-        risk_score = safe_float(
-            event.get(
-                "risk_score",
-                0,
-            )
-        )
-
-        decision = str(
-            event.get(
-                "decision",
-                "",
-            )
-        ).upper()
-
-        if prediction_mode == "Risk Threshold":
-
-            predicted_attack = (
-                risk_score >= threshold
-            )
-
-        elif prediction_mode == "Authorization Decision":
-
-            predicted_attack = (
-                decision == "DENY"
-            )
-
-        else:
-
-            predicted_attack = (
-                risk_score >= threshold
-                or decision == "DENY"
-            )
-
-        actual_attack = (
-            ground_truth == "MALICIOUS"
-        )
-
-        actual_positive.append(
-            actual_attack
-        )
-
-        actual_negative.append(
-            not actual_attack
-        )
-
-        predicted_positive.append(
-            predicted_attack
-        )
-
-        predicted_negative.append(
-            not predicted_attack
-        )
-
-    return calculate_binary_metrics(
-        actual_positive,
-        actual_negative,
-        predicted_positive,
-        predicted_negative,
-    )
-
-
-def build_threshold_evaluation(
-    dataset,
-    thresholds,
-):
-    """
-    Evaluate detection performance across
-    multiple risk thresholds.
-    """
-
-    rows = []
-
-    for threshold in thresholds:
-
-        metrics = evaluate_dataset(
-            dataset,
-            threshold,
-            "Risk Threshold",
-        )
-
-        rows.append(
-            {
-                "Threshold":
-                    threshold,
-
-                "Accuracy":
-                    metrics["accuracy"],
-
-                "Precision":
-                    metrics["precision"],
-
-                "Recall":
-                    metrics["recall"],
-
-                "F1":
-                    metrics["f1_score"],
-
-                "Specificity":
-                    metrics["specificity"],
-
-                "FPR":
-                    metrics["false_positive_rate"],
-
-                "FNR":
-                    metrics["false_negative_rate"],
-            }
-        )
-
-    return pd.DataFrame(
-        rows
-    )
 
 
 # ============================================================
@@ -465,7 +210,7 @@ with st.sidebar:
     st.divider()
 
     st.subheader(
-        "Research Modules"
+        "Security Modules"
     )
 
     show_overview = st.checkbox(
@@ -479,22 +224,22 @@ with st.sidebar:
     )
 
     show_day21 = st.checkbox(
-        "Day 21 Scenario Lab",
+        "Controlled Scenarios",
         value=True,
     )
 
     show_day22 = st.checkbox(
-        "Day 22 Attack Research",
+        "Attack Research",
         value=True,
     )
 
     show_day23 = st.checkbox(
-        "Day 23 Dataset Lab",
+        "Experimental Dataset",
         value=True,
     )
 
-    show_day24 = st.checkbox(
-        "Day 24 Evaluation Lab",
+    show_day25 = st.checkbox(
+        "Baseline Comparison",
         value=True,
     )
 
@@ -526,65 +271,81 @@ with st.sidebar:
     st.divider()
 
     st.subheader(
-        "Research Progress"
+        "Research Roadmap"
     )
 
     st.markdown(
         """
         **Days 1–15**
+
         Security Foundation
 
         ↓
 
         **Day 16**
+
         Advanced SOC
 
         ↓
 
         **Day 17**
+
         Investigation
 
         ↓
 
         **Day 18**
+
         Behavioral Features
 
         ↓
 
         **Day 19**
+
         Anomaly Detection
 
         ↓
 
         **Day 20**
+
         Integrated Intelligence
 
         ↓
 
         **Day 21**
+
         Controlled Scenarios
 
         ↓
 
         **Day 22**
+
         Attack Taxonomy
 
         ↓
 
         **Day 23**
+
         Experimental Dataset
 
         ↓
 
         **Day 24**
+
         Quantitative Evaluation
+
+        ↓
+
+        **Day 25**
+
+        Baseline Comparison
         """
     )
 
     st.divider()
 
     st.caption(
-        f"Dataset: {DATASET_VERSION}"
+        f"Dataset Version: {DATASET_VERSION}"
     )
 
     st.caption(
@@ -593,38 +354,24 @@ with st.sidebar:
 
 
 # ============================================================
-# LOAD SECURITY TELEMETRY
+# LOAD CORE SECURITY DATA
 # ============================================================
 
 try:
 
-    total_events = (
-        get_total_events()
-    )
+    total_events = get_total_events()
 
-    decisions = (
-        get_decision_counts()
-    )
+    decisions = get_decision_counts()
 
-    risk = (
-        get_risk_summary()
-    )
+    risk = get_risk_summary()
 
-    agents = (
-        get_agent_activity()
-    )
+    agents = get_agent_activity()
 
-    high_risk_events = (
-        get_high_risk_events()
-    )
+    high_risk_events = get_high_risk_events()
 
-    suspicious_agents = (
-        get_suspicious_agents()
-    )
+    suspicious_agents = get_suspicious_agents()
 
-    repeated_denials = (
-        get_repeated_denials()
-    )
+    repeated_denials = get_repeated_denials()
 
 except Exception as error:
 
@@ -636,7 +383,7 @@ except Exception as error:
 
 
 # ============================================================
-# BEHAVIORAL FEATURES
+# LOAD BEHAVIORAL FEATURES
 # ============================================================
 
 try:
@@ -651,7 +398,7 @@ except Exception:
 
 
 # ============================================================
-# ANOMALIES
+# LOAD ANOMALIES
 # ============================================================
 
 try:
@@ -678,13 +425,13 @@ except Exception:
 
 
 # ============================================================
-# SECURITY OVERVIEW
+# DAY 16 — SECURITY OVERVIEW
 # ============================================================
 
 if show_overview:
 
     st.header(
-        "📊 Security Overview"
+        "📊 Security Operations Overview"
     )
 
     c1, c2, c3, c4, c5 = (
@@ -731,7 +478,7 @@ if show_overview:
     with c5:
 
         st.metric(
-            "Critical",
+            "Critical Events",
             risk.get(
                 "critical_events",
                 0,
@@ -780,25 +527,23 @@ if show_overview:
             ),
         )
 
+    st.subheader(
+        "Authorization Decisions"
+    )
+
     decision_df = pd.DataFrame(
         {
-            "Decision":
-                list(
-                    decisions.keys()
-                ),
+            "Decision": list(
+                decisions.keys()
+            ),
 
-            "Count":
-                list(
-                    decisions.values()
-                ),
+            "Count": list(
+                decisions.values()
+            ),
         }
     )
 
     if not decision_df.empty:
-
-        st.subheader(
-            "Authorization Decisions"
-        )
 
         st.bar_chart(
             decision_df.set_index(
@@ -807,9 +552,15 @@ if show_overview:
             width="stretch",
         )
 
+    else:
+
+        st.info(
+            "No authorization decisions available."
+        )
+
 
 # ============================================================
-# INTEGRATED INTELLIGENCE
+# INTEGRATED SECURITY INTELLIGENCE
 # ============================================================
 
 if show_intelligence:
@@ -819,8 +570,6 @@ if show_intelligence:
     st.header(
         "🧠 Integrated Security Intelligence"
     )
-
-    intelligence_records = []
 
     anomaly_lookup = {
         str(
@@ -839,8 +588,11 @@ if show_intelligence:
                 "",
             )
         )
+
         for item in suspicious_agents
     }
+
+    intelligence_records = []
 
     for agent in agents:
 
@@ -865,7 +617,7 @@ if show_intelligence:
             )
         )
 
-        max_risk = safe_float(
+        maximum_risk = safe_float(
             agent.get(
                 "maximum_risk",
                 0,
@@ -900,7 +652,7 @@ if show_intelligence:
         )
 
         intelligence_score = (
-            max_risk * 0.40
+            maximum_risk * 0.40
             + denial_rate * 100 * 0.30
             + min(
                 anomaly_score * 20,
@@ -932,35 +684,20 @@ if show_intelligence:
 
         intelligence_records.append(
             {
-                "agent_id":
-                    agent_id,
-
-                "total_requests":
-                    total,
-
-                "denied_requests":
-                    denied,
-
-                "denial_rate":
-                    round(
-                        denial_rate * 100,
-                        2,
-                    ),
-
-                "maximum_risk":
-                    max_risk,
-
-                "anomaly_score":
-                    anomaly_score,
-
-                "intelligence_score":
-                    round(
-                        intelligence_score,
-                        2,
-                    ),
-
-                "priority":
-                    priority,
+                "agent_id": agent_id,
+                "total_requests": total,
+                "denied_requests": denied,
+                "denial_rate": round(
+                    denial_rate * 100,
+                    2,
+                ),
+                "maximum_risk": maximum_risk,
+                "anomaly_score": anomaly_score,
+                "intelligence_score": round(
+                    intelligence_score,
+                    2,
+                ),
+                "priority": priority,
             }
         )
 
@@ -979,9 +716,15 @@ if show_intelligence:
             hide_index=True,
         )
 
+    else:
+
+        st.info(
+            "No integrated intelligence records available."
+        )
+
 
 # ============================================================
-# DAY 21 — SCENARIO LAB
+# DAY 21 — CONTROLLED SECURITY SCENARIOS
 # ============================================================
 
 if show_day21:
@@ -989,7 +732,7 @@ if show_day21:
     st.divider()
 
     st.header(
-        "🧪 Day 21 — Controlled Scenario Lab"
+        "🧪 Controlled Security Scenario Lab"
     )
 
     try:
@@ -1054,7 +797,7 @@ if show_day21:
             SUSPICIOUS,
             MALICIOUS,
         ],
-        key="day21_class",
+        key="day21_scenario_class",
     )
 
     try:
@@ -1087,9 +830,15 @@ if show_day21:
             hide_index=True,
         )
 
+    else:
+
+        st.info(
+            "No scenarios available."
+        )
+
 
 # ============================================================
-# DAY 22 — ATTACK RESEARCH
+# DAY 22 — ATTACK SCENARIO RESEARCH
 # ============================================================
 
 if show_day22:
@@ -1097,7 +846,7 @@ if show_day22:
     st.divider()
 
     st.header(
-        "⚔️ Day 22 — Attack Scenario Research"
+        "⚔️ Attack Scenario Research"
     )
 
     attack_summary = (
@@ -1183,9 +932,15 @@ if show_day22:
             hide_index=True,
         )
 
+    else:
+
+        st.info(
+            "No attack scenarios available."
+        )
+
 
 # ============================================================
-# DAY 23 — DATASET LAB
+# DAY 23 — EXPERIMENTAL DATASET
 # ============================================================
 
 if show_day23:
@@ -1193,12 +948,11 @@ if show_day23:
     st.divider()
 
     st.header(
-        "🧬 Day 23 — Experimental Dataset Lab"
+        "🧬 Experimental Dataset Laboratory"
     )
 
     st.caption(
-        "Generate a reproducible dataset from the "
-        "controlled security scenario catalog."
+        "Generate a reproducible dataset for controlled research experiments."
     )
 
     d1, d2, d3 = (
@@ -1213,7 +967,7 @@ if show_day23:
             max_value=100,
             value=5,
             step=1,
-            key="day23_events",
+            key="day23_events_per_scenario",
         )
 
     with d2:
@@ -1224,7 +978,7 @@ if show_day23:
             max_value=999999,
             value=42,
             step=1,
-            key="day23_seed",
+            key="day23_experiment_seed",
         )
 
     with d3:
@@ -1235,9 +989,9 @@ if show_day23:
         )
 
     if st.button(
-        "🧬 Generate Dataset",
+        "🧬 Generate Experimental Dataset",
         type="primary",
-        key="generate_day23_dataset",
+        key="day23_generate",
     ):
 
         try:
@@ -1274,8 +1028,14 @@ if show_day23:
                 )
             )
 
+            # Reset Day 25 results because
+            # the underlying dataset changed.
+            st.session_state.day25_baseline = None
+            st.session_state.day25_aegisguard = None
+            st.session_state.day25_comparison = None
+
             st.success(
-                f"Generated {len(dataset)} events."
+                f"Generated {len(dataset)} experimental events."
             )
 
         except Exception as error:
@@ -1310,7 +1070,7 @@ if show_day23:
                 "Events",
                 summary.get(
                     "total_events",
-                    0,
+                    len(dataset),
                 ),
             )
 
@@ -1347,7 +1107,7 @@ if show_day23:
         with m5:
 
             st.metric(
-                "Avg Risk",
+                "Average Risk",
                 summary.get(
                     "average_risk",
                     0,
@@ -1383,116 +1143,135 @@ if show_day23:
             hide_index=True,
         )
 
-        csv_data = dataset_to_csv(
-            dataset
+        st.subheader(
+            "Ground-Truth Distribution"
         )
 
-        jsonl_data = dataset_to_jsonl(
-            dataset
+        distribution = (
+            get_label_distribution(
+                dataset
+            )
         )
 
-        dc1, dc2 = (
+        distribution_df = pd.DataFrame(
+            {
+                "Class": list(
+                    distribution.keys()
+                ),
+
+                "Count": list(
+                    distribution.values()
+                ),
+            }
+        )
+
+        if not distribution_df.empty:
+
+            st.bar_chart(
+                distribution_df.set_index(
+                    "Class"
+                ),
+                width="stretch",
+            )
+
+        download_col1, download_col2 = (
             st.columns(2)
         )
 
-        with dc1:
+        with download_col1:
 
             st.download_button(
                 "⬇️ Download CSV",
-                data=csv_data,
+                data=dataset_to_csv(
+                    dataset
+                ),
                 file_name=(
                     "aegisguard_day23_dataset.csv"
                 ),
                 mime="text/csv",
-                use_container_width=True,
-                key="download_day23_csv",
+                width="stretch",
+                key="day23_download_csv",
             )
 
-        with dc2:
+        with download_col2:
 
             st.download_button(
                 "⬇️ Download JSONL",
-                data=jsonl_data,
+                data=dataset_to_jsonl(
+                    dataset
+                ),
                 file_name=(
                     "aegisguard_day23_dataset.jsonl"
                 ),
                 mime="application/json",
-                use_container_width=True,
-                key="download_day23_jsonl",
+                width="stretch",
+                key="day23_download_jsonl",
             )
 
 
 # ============================================================
-# DAY 24 — QUANTITATIVE EVALUATION LAB
+# DAY 25 — BASELINE VS AEGISGUARD
 # ============================================================
 
-if show_day24:
+if show_day25:
 
     st.divider()
 
     st.header(
-        "📈 Day 24 — Quantitative Detection Evaluation"
+        "🔬 Day 25 — Baseline vs AegisGuard"
     )
 
     st.caption(
-        "Controlled evaluation of AegisGuard detection "
-        "performance against ground-truth experimental events."
+        "Controlled quantitative comparison using the same "
+        "experimental dataset and ground-truth labels."
     )
 
     # --------------------------------------------------------
-    # RESEARCH DEFINITION
+    # METHODOLOGY
     # --------------------------------------------------------
 
     with st.expander(
-        "🔬 Evaluation Methodology",
+        "📖 Experimental Methodology",
         expanded=True,
     ):
 
         st.markdown(
             """
-            ### Evaluation target
+            ### Research Question
 
-            **Positive class:** `MALICIOUS`
+            **Does the current AegisGuard detection approach
+            produce different detection performance from a
+            transparent baseline under identical experimental
+            conditions?**
 
-            **Negative class:** `BENIGN + SUSPICIOUS`
+            ### Positive Class
 
-            The evaluation compares AegisGuard's predicted
-            security signal against the known ground-truth
-            label in the synthetic experimental dataset.
+            `MALICIOUS`
 
-            ### Metrics
+            ### Negative Class
 
-            **Accuracy**
+            `BENIGN + SUSPICIOUS`
 
-            Overall proportion of correctly classified events.
+            ### Baseline
 
-            **Precision**
+            A transparent rule-based detector:
 
-            Proportion of predicted malicious events that
-            were actually malicious.
+            **DENY OR risk ≥ threshold → MALICIOUS**
 
-            **Recall / Detection Rate**
+            ### AegisGuard
 
-            Proportion of actual malicious events detected.
+            The current experimental AegisGuard rule:
 
-            **Specificity**
+            **DENY OR risk ≥ threshold → MALICIOUS**
 
-            Proportion of non-malicious events correctly
-            identified as non-malicious.
+            Both detectors are evaluated on exactly the same
+            experimental dataset.
 
-            **F1 Score**
+            The purpose of Day 25 is to establish a reproducible
+            baseline comparison framework.
 
-            Harmonic mean of precision and recall.
-
-            **False Positive Rate**
-
-            Proportion of non-malicious events incorrectly
-            classified as malicious.
-
-            **False Negative Rate**
-
-            Proportion of malicious events missed by the
-            detector.
+            **A single experiment does not establish statistical
+            superiority or real-world generalization.**
             """
         )
 
@@ -1507,28 +1286,18 @@ if show_day24:
     if not evaluation_dataset:
 
         st.warning(
-            "No Day 23 dataset is currently loaded."
+            "No experimental dataset is currently loaded."
         )
 
         st.info(
-            "Generate the Day 23 experimental dataset "
-            "above before running the Day 24 evaluation."
+            "Generate a dataset in the Day 23 section first."
         )
 
     else:
 
-        evaluation_df = pd.DataFrame(
+        dataset_size = len(
             evaluation_dataset
         )
-
-        st.success(
-            f"Evaluation dataset loaded: "
-            f"{len(evaluation_dataset)} events"
-        )
-
-        # ----------------------------------------------------
-        # CLASS DISTRIBUTION
-        # ----------------------------------------------------
 
         distribution = (
             get_label_distribution(
@@ -1536,638 +1305,582 @@ if show_day24:
             )
         )
 
-        st.subheader(
-            "Ground-Truth Class Distribution"
+        st.success(
+            f"Evaluation dataset loaded: {dataset_size} events."
         )
 
-        class_df = pd.DataFrame(
-            {
-                "Class": [
-                    "BENIGN",
-                    "SUSPICIOUS",
-                    "MALICIOUS",
-                ],
-
-                "Count": [
-                    distribution.get(
-                        "BENIGN",
-                        0,
-                    ),
-
-                    distribution.get(
-                        "SUSPICIOUS",
-                        0,
-                    ),
-
-                    distribution.get(
-                        "MALICIOUS",
-                        0,
-                    ),
-                ],
-            }
-        )
-
-        cc1, cc2 = (
-            st.columns(2)
-        )
-
-        with cc1:
-
-            st.bar_chart(
-                class_df.set_index(
-                    "Class"
-                ),
-                width="stretch",
-            )
-
-        with cc2:
-
-            st.dataframe(
-                class_df,
-                width="stretch",
-                hide_index=True,
-            )
-
-        # ----------------------------------------------------
-        # RESEARCH WARNING
-        # ----------------------------------------------------
-
-        total_classes = sum(
+        total_labels = sum(
             distribution.values()
         )
 
-        if total_classes:
+        if total_labels:
 
             malicious_ratio = (
                 distribution.get(
                     "MALICIOUS",
                     0,
                 )
-                / total_classes
+                / total_labels
             )
 
-            suspicious_ratio = (
-                distribution.get(
-                    "SUSPICIOUS",
-                    0,
-                )
-                / total_classes
-            )
-
-            if (
-                malicious_ratio > 0.70
-                or suspicious_ratio == 0
-            ):
+            if malicious_ratio > 0.70:
 
                 st.warning(
-                    "Dataset imbalance detected. "
-                    "Current results should be interpreted "
-                    "as controlled prototype measurements, "
-                    "not generalized production performance."
+                    f"Class imbalance warning: "
+                    f"MALICIOUS represents "
+                    f"{malicious_ratio * 100:.1f}% "
+                    "of the dataset."
                 )
 
         # ----------------------------------------------------
-        # EVALUATION CONTROLS
+        # EXPERIMENT CONTROLS
         # ----------------------------------------------------
 
         st.subheader(
-            "Evaluation Configuration"
+            "Experimental Controls"
         )
 
-        e1, e2 = (
+        threshold_col1, threshold_col2 = (
             st.columns(2)
         )
 
-        with e1:
+        with threshold_col1:
 
-            prediction_mode = st.selectbox(
-                "Prediction Signal",
-                [
-                    "Risk Threshold",
-                    "Authorization Decision",
-                    "Risk OR Authorization",
-                ],
-                key="day24_prediction_mode",
-            )
-
-        with e2:
-
-            risk_threshold = st.slider(
-                "Risk Detection Threshold",
+            baseline_threshold = st.slider(
+                "Baseline Risk Threshold",
                 min_value=0,
                 max_value=100,
                 value=70,
                 step=5,
-                key="day24_risk_threshold",
+                key="day25_baseline_threshold",
+            )
+
+        with threshold_col2:
+
+            aegisguard_threshold = st.slider(
+                "AegisGuard Risk Threshold",
+                min_value=0,
+                max_value=100,
+                value=70,
+                step=5,
+                key="day25_aegisguard_threshold",
             )
 
         # ----------------------------------------------------
-        # CALCULATE METRICS
+        # RUN EXPERIMENT
         # ----------------------------------------------------
 
-        metrics = evaluate_dataset(
-            evaluation_dataset,
-            risk_threshold,
-            prediction_mode,
-        )
+        if st.button(
+            "▶️ Run Baseline Comparison",
+            type="primary",
+            key="day25_run",
+        ):
 
-        st.subheader(
-            "Detection Performance"
-        )
-
-        p1, p2, p3, p4, p5 = (
-            st.columns(5)
-        )
-
-        with p1:
-
-            st.metric(
-                "Accuracy",
-                f"{metrics['accuracy'] * 100:.2f}%",
-            )
-
-        with p2:
-
-            st.metric(
-                "Precision",
-                f"{metrics['precision'] * 100:.2f}%",
-            )
-
-        with p3:
-
-            st.metric(
-                "Recall",
-                f"{metrics['recall'] * 100:.2f}%",
-            )
-
-        with p4:
-
-            st.metric(
-                "F1 Score",
-                f"{metrics['f1_score'] * 100:.2f}%",
-            )
-
-        with p5:
-
-            st.metric(
-                "Specificity",
-                f"{metrics['specificity'] * 100:.2f}%",
-            )
-
-        # ----------------------------------------------------
-        # ERROR METRICS
-        # ----------------------------------------------------
-
-        f1, f2, f3 = (
-            st.columns(3)
-        )
-
-        with f1:
-
-            st.metric(
-                "False Positive Rate",
-                f"{metrics['false_positive_rate'] * 100:.2f}%",
-            )
-
-        with f2:
-
-            st.metric(
-                "False Negative Rate",
-                f"{metrics['false_negative_rate'] * 100:.2f}%",
-            )
-
-        with f3:
-
-            st.metric(
-                "Detection Rate",
-                f"{metrics['recall'] * 100:.2f}%",
-            )
-
-        # ----------------------------------------------------
-        # CONFUSION MATRIX
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Confusion Matrix"
-        )
-
-        cm_df = pd.DataFrame(
-            [
-                [
-                    metrics["true_negative"],
-                    metrics["false_positive"],
-                ],
-
-                [
-                    metrics["false_negative"],
-                    metrics["true_positive"],
-                ],
-            ],
-
-            index=[
-                "Actual Non-Malicious",
-                "Actual Malicious",
-            ],
-
-            columns=[
-                "Predicted Non-Malicious",
-                "Predicted Malicious",
-            ],
-        )
-
-        cm1, cm2 = (
-            st.columns(2)
-        )
-
-        with cm1:
-
-            st.dataframe(
-                cm_df,
-                width="stretch",
-            )
-
-        with cm2:
-
-            st.metric(
-                "True Positives",
-                metrics["true_positive"],
-            )
-
-            st.metric(
-                "True Negatives",
-                metrics["true_negative"],
-            )
-
-            st.metric(
-                "False Positives",
-                metrics["false_positive"],
-            )
-
-            st.metric(
-                "False Negatives",
-                metrics["false_negative"],
-            )
-
-        # ----------------------------------------------------
-        # THRESHOLD ANALYSIS
-        # ----------------------------------------------------
-
-        st.divider()
-
-        st.subheader(
-            "📐 Risk Threshold Sensitivity Analysis"
-        )
-
-        st.caption(
-            "Measure how detection performance changes "
-            "as the risk threshold changes."
-        )
-
-        thresholds = list(
-            range(
-                0,
-                101,
-                5,
-            )
-        )
-
-        threshold_df = (
-            build_threshold_evaluation(
+            (
+                baseline_metrics,
+                aegisguard_metrics,
+                comparison_df,
+            ) = compare_detectors(
                 evaluation_dataset,
-                thresholds,
+                baseline_threshold=baseline_threshold,
+                aegisguard_threshold=aegisguard_threshold,
             )
-        )
 
-        st.dataframe(
-            threshold_df,
-            width="stretch",
-            hide_index=True,
-        )
-
-        threshold_chart_df = (
-            threshold_df[
-                [
-                    "Threshold",
-                    "Precision",
-                    "Recall",
-                    "F1",
-                    "Specificity",
-                ]
-            ]
-            .set_index(
-                "Threshold"
+            st.session_state.day25_baseline = (
+                baseline_metrics
             )
-        )
 
-        st.line_chart(
-            threshold_chart_df,
-            width="stretch",
-        )
+            st.session_state.day25_aegisguard = (
+                aegisguard_metrics
+            )
+
+            st.session_state.day25_comparison = (
+                comparison_df
+            )
+
+            st.success(
+                "Baseline comparison completed."
+            )
 
         # ----------------------------------------------------
-        # BEST F1 THRESHOLD
+        # DISPLAY RESULTS
         # ----------------------------------------------------
 
-        if not threshold_df.empty:
+        baseline_metrics = (
+            st.session_state.day25_baseline
+        )
 
-            best_row = (
-                threshold_df.sort_values(
-                    "F1",
-                    ascending=False,
-                )
-                .iloc[0]
-            )
+        aegisguard_metrics = (
+            st.session_state.day25_aegisguard
+        )
+
+        comparison_df = (
+            st.session_state.day25_comparison
+        )
+
+        if (
+            baseline_metrics is not None
+            and aegisguard_metrics is not None
+            and comparison_df is not None
+        ):
+
+            st.divider()
 
             st.subheader(
-                "Recommended Experimental Threshold"
+                "🏁 Quantitative Comparison"
             )
 
-            b1, b2, b3 = (
-                st.columns(3)
+            display_df = (
+                comparison_df.copy()
             )
 
-            with b1:
+            for column in [
+                "Baseline",
+                "AegisGuard",
+            ]:
 
-                st.metric(
-                    "Best F1 Threshold",
-                    int(
-                        best_row[
-                            "Threshold"
-                        ]
-                    ),
-                )
+                display_df[column] = (
+                    display_df[column] * 100
+                ).round(2)
 
-            with b2:
+            display_df["Difference"] = (
+                display_df["Difference"] * 100
+            ).round(2)
 
-                st.metric(
-                    "Best F1",
-                    f"{best_row['F1'] * 100:.2f}%",
-                )
+            display_df = display_df.rename(
+                columns={
+                    "Baseline":
+                        "Baseline (%)",
 
-            with b3:
+                    "AegisGuard":
+                        "AegisGuard (%)",
 
-                st.metric(
-                    "Recall at Best F1",
-                    f"{best_row['Recall'] * 100:.2f}%",
-                )
-
-            st.info(
-                "This threshold is selected only by maximum "
-                "F1 on the current synthetic dataset. "
-                "It must not be treated as a production "
-                "security threshold without independent "
-                "validation data."
-            )
-
-        # ----------------------------------------------------
-        # EVENT-LEVEL PREDICTIONS
-        # ----------------------------------------------------
-
-        st.subheader(
-            "Event-Level Evaluation"
-        )
-
-        evaluated_rows = []
-
-        for event in evaluation_dataset:
-
-            risk_score = safe_float(
-                event.get(
-                    "risk_score",
-                    0,
-                )
-            )
-
-            decision = str(
-                event.get(
-                    "decision",
-                    "",
-                )
-            ).upper()
-
-            ground_truth = str(
-                event.get(
-                    "ground_truth",
-                    "",
-                )
-            ).upper()
-
-            if prediction_mode == "Risk Threshold":
-
-                predicted = (
-                    risk_score
-                    >= risk_threshold
-                )
-
-            elif prediction_mode == "Authorization Decision":
-
-                predicted = (
-                    decision == "DENY"
-                )
-
-            else:
-
-                predicted = (
-                    risk_score
-                    >= risk_threshold
-                    or decision == "DENY"
-                )
-
-            actual = (
-                ground_truth == "MALICIOUS"
-            )
-
-            if actual and predicted:
-
-                classification = "TP"
-
-            elif actual and not predicted:
-
-                classification = "FN"
-
-            elif not actual and predicted:
-
-                classification = "FP"
-
-            else:
-
-                classification = "TN"
-
-            evaluated_rows.append(
-                {
-                    "event_id":
-                        event.get(
-                            "event_id",
-                            "",
-                        ),
-
-                    "scenario_id":
-                        event.get(
-                            "scenario_id",
-                            "",
-                        ),
-
-                    "ground_truth":
-                        ground_truth,
-
-                    "risk_score":
-                        risk_score,
-
-                    "decision":
-                        decision,
-
-                    "predicted_malicious":
-                        predicted,
-
-                    "classification":
-                        classification,
+                    "Difference":
+                        "Difference (pp)",
                 }
             )
 
-        evaluated_df = pd.DataFrame(
-            evaluated_rows
-        )
-
-        classification_filter = st.selectbox(
-            "Evaluation Result",
-            [
-                "ALL",
-                "TP",
-                "TN",
-                "FP",
-                "FN",
-            ],
-            key="day24_result_filter",
-        )
-
-        display_df = (
-            evaluated_df
-        )
-
-        if classification_filter != "ALL":
-
-            display_df = evaluated_df[
-                evaluated_df[
-                    "classification"
-                ]
-                == classification_filter
-            ]
-
-        st.write(
-            f"Matching events: "
-            f"**{len(display_df)}**"
-        )
-
-        st.dataframe(
-            display_df,
-            width="stretch",
-            hide_index=True,
-        )
-
-        # ----------------------------------------------------
-        # EXPORT EVALUATION RESULTS
-        # ----------------------------------------------------
-
-        evaluation_csv = (
-            evaluated_df.to_csv(
-                index=False
+            st.dataframe(
+                display_df,
+                width="stretch",
+                hide_index=True,
             )
-        )
 
-        st.download_button(
-            "⬇️ Download Evaluation Results",
-            data=evaluation_csv,
-            file_name=(
-                "aegisguard_day24_evaluation_results.csv"
-            ),
-            mime="text/csv",
-            use_container_width=True,
-            key="day24_download",
-        )
+            # ------------------------------------------------
+            # KPI CARDS
+            # ------------------------------------------------
 
-        # ----------------------------------------------------
-        # RESEARCH METADATA
-        # ----------------------------------------------------
+            st.subheader(
+                "Performance Indicators"
+            )
 
-        st.subheader(
-            "🔬 Experimental Metadata"
-        )
+            baseline_col, aegisguard_col = (
+                st.columns(2)
+            )
 
-        metadata_df = pd.DataFrame(
-            {
-                "Parameter": [
-                    "Dataset Version",
-                    "Evaluation Target",
-                    "Prediction Mode",
-                    "Risk Threshold",
-                    "Dataset Size",
-                    "Positive Class",
-                    "Negative Class",
-                ],
+            with baseline_col:
 
-                "Value": [
-                    DATASET_VERSION,
-                    "Malicious Detection",
-                    prediction_mode,
-                    risk_threshold,
-                    len(
-                        evaluation_dataset
+                st.markdown(
+                    "### 🔹 Baseline"
+                )
+
+                b1, b2, b3, b4 = (
+                    st.columns(4)
+                )
+
+                with b1:
+
+                    st.metric(
+                        "Accuracy",
+                        f"{baseline_metrics['Accuracy'] * 100:.2f}%",
+                    )
+
+                with b2:
+
+                    st.metric(
+                        "Precision",
+                        f"{baseline_metrics['Precision'] * 100:.2f}%",
+                    )
+
+                with b3:
+
+                    st.metric(
+                        "Recall",
+                        f"{baseline_metrics['Recall'] * 100:.2f}%",
+                    )
+
+                with b4:
+
+                    st.metric(
+                        "F1",
+                        f"{baseline_metrics['F1'] * 100:.2f}%",
+                    )
+
+            with aegisguard_col:
+
+                st.markdown(
+                    "### 🛡️ AegisGuard"
+                )
+
+                a1, a2, a3, a4 = (
+                    st.columns(4)
+                )
+
+                with a1:
+
+                    st.metric(
+                        "Accuracy",
+                        f"{aegisguard_metrics['Accuracy'] * 100:.2f}%",
+                    )
+
+                with a2:
+
+                    st.metric(
+                        "Precision",
+                        f"{aegisguard_metrics['Precision'] * 100:.2f}%",
+                    )
+
+                with a3:
+
+                    st.metric(
+                        "Recall",
+                        f"{aegisguard_metrics['Recall'] * 100:.2f}%",
+                    )
+
+                with a4:
+
+                    st.metric(
+                        "F1",
+                        f"{aegisguard_metrics['F1'] * 100:.2f}%",
+                    )
+
+            # ------------------------------------------------
+            # CONFUSION MATRICES
+            # ------------------------------------------------
+
+            st.subheader(
+                "Confusion Matrices"
+            )
+
+            cm1, cm2 = (
+                st.columns(2)
+            )
+
+            with cm1:
+
+                st.markdown(
+                    "### Baseline"
+                )
+
+                st.dataframe(
+                    get_confusion_matrix(
+                        baseline_metrics
                     ),
-                    "MALICIOUS",
-                    "BENIGN + SUSPICIOUS",
-                ],
-            }
-        )
+                    width="stretch",
+                )
 
-        st.dataframe(
-            metadata_df,
-            width="stretch",
-            hide_index=True,
-        )
+            with cm2:
 
-        # ----------------------------------------------------
-        # RESEARCH INTERPRETATION
-        # ----------------------------------------------------
+                st.markdown(
+                    "### AegisGuard"
+                )
 
-        st.subheader(
-            "🧪 Interpretation"
-        )
+                st.dataframe(
+                    get_confusion_matrix(
+                        aegisguard_metrics
+                    ),
+                    width="stretch",
+                )
 
-        if metrics["false_positive_rate"] > 0:
+            # ------------------------------------------------
+            # RESEARCH SUMMARY
+            # ------------------------------------------------
+
+            summary = (
+                generate_comparison_summary(
+                    baseline_metrics,
+                    aegisguard_metrics,
+                )
+            )
+
+            st.subheader(
+                "🔬 Research Interpretation"
+            )
+
+            f1_difference = (
+                summary["f1_difference"]
+            )
+
+            precision_difference = (
+                summary["precision_difference"]
+            )
+
+            recall_difference = (
+                summary["recall_difference"]
+            )
+
+            if summary["outcome"] == (
+                "AEGISGUARD_HIGHER_F1"
+            ):
+
+                st.info(
+                    f"AegisGuard achieved a higher F1 "
+                    f"score than the baseline by "
+                    f"{f1_difference * 100:.2f} "
+                    "percentage points in this experiment."
+                )
+
+            elif summary["outcome"] == (
+                "BASELINE_HIGHER_F1"
+            ):
+
+                st.warning(
+                    f"The baseline achieved a higher F1 "
+                    f"score than AegisGuard by "
+                    f"{abs(f1_difference) * 100:.2f} "
+                    "percentage points in this experiment."
+                )
+
+            else:
+
+                st.info(
+                    "Both approaches produced the same "
+                    "F1 score in this experiment."
+                )
+
+            i1, i2, i3 = (
+                st.columns(3)
+            )
+
+            with i1:
+
+                st.metric(
+                    "F1 Difference",
+                    f"{f1_difference * 100:.2f} pp",
+                )
+
+            with i2:
+
+                st.metric(
+                    "Precision Difference",
+                    f"{precision_difference * 100:.2f} pp",
+                )
+
+            with i3:
+
+                st.metric(
+                    "Recall Difference",
+                    f"{recall_difference * 100:.2f} pp",
+                )
 
             st.warning(
-                "False positives are present. This means "
-                "the current detector is classifying at least "
-                "some non-malicious events as malicious."
+                "These results represent one controlled "
+                "experiment. They must not be presented as "
+                "proof of statistical superiority."
             )
 
-        else:
+            # ------------------------------------------------
+            # THRESHOLD SENSITIVITY
+            # ------------------------------------------------
 
-            st.success(
-                "No false positives were observed in this "
-                "controlled experiment."
+            st.divider()
+
+            st.subheader(
+                "📐 Threshold Sensitivity Analysis"
             )
 
-        if metrics["false_negative_rate"] > 0:
-
-            st.warning(
-                "False negatives are present. Some malicious "
-                "events were not detected by the current "
-                "prediction rule."
+            thresholds = list(
+                range(
+                    0,
+                    101,
+                    5,
+                )
             )
 
-        else:
-
-            st.success(
-                "No false negatives were observed in this "
-                "controlled experiment."
+            baseline_sweep = (
+                build_baseline_sweep(
+                    evaluation_dataset,
+                    thresholds,
+                )
             )
 
-        st.info(
-            "These measurements describe this experimental "
-            "dataset only. They are not evidence of real-world "
-            "generalization."
-        )
+            aegisguard_sweep = (
+                build_aegisguard_sweep(
+                    evaluation_dataset,
+                    thresholds,
+                )
+            )
+
+            f1_df = pd.DataFrame(
+                {
+                    "Baseline F1":
+                        baseline_sweep["F1"],
+
+                    "AegisGuard F1":
+                        aegisguard_sweep["F1"],
+                },
+                index=thresholds,
+            )
+
+            f1_df.index.name = (
+                "Risk Threshold"
+            )
+
+            st.markdown(
+                "#### F1 Score vs Risk Threshold"
+            )
+
+            st.line_chart(
+                f1_df,
+                width="stretch",
+            )
+
+            recall_df = pd.DataFrame(
+                {
+                    "Baseline Recall":
+                        baseline_sweep["Recall"],
+
+                    "AegisGuard Recall":
+                        aegisguard_sweep["Recall"],
+                },
+                index=thresholds,
+            )
+
+            recall_df.index.name = (
+                "Risk Threshold"
+            )
+
+            st.markdown(
+                "#### Recall vs Risk Threshold"
+            )
+
+            st.line_chart(
+                recall_df,
+                width="stretch",
+            )
+
+            precision_df = pd.DataFrame(
+                {
+                    "Baseline Precision":
+                        baseline_sweep["Precision"],
+
+                    "AegisGuard Precision":
+                        aegisguard_sweep["Precision"],
+                },
+                index=thresholds,
+            )
+
+            precision_df.index.name = (
+                "Risk Threshold"
+            )
+
+            st.markdown(
+                "#### Precision vs Risk Threshold"
+            )
+
+            st.line_chart(
+                precision_df,
+                width="stretch",
+            )
+
+            # ------------------------------------------------
+            # OPTIMAL THRESHOLDS
+            # ------------------------------------------------
+
+            st.subheader(
+                "🎯 Best Experimental Threshold"
+            )
+
+            best_baseline = (
+                get_best_threshold(
+                    baseline_sweep,
+                    metric="F1",
+                )
+            )
+
+            best_aegisguard = (
+                get_best_threshold(
+                    aegisguard_sweep,
+                    metric="F1",
+                )
+            )
+
+            bt1, bt2 = (
+                st.columns(2)
+            )
+
+            with bt1:
+
+                st.metric(
+                    "Baseline",
+                    f"Threshold {best_baseline['Threshold']:.0f}",
+                    f"F1 {best_baseline['F1'] * 100:.2f}%",
+                )
+
+            with bt2:
+
+                st.metric(
+                    "AegisGuard",
+                    f"Threshold {best_aegisguard['Threshold']:.0f}",
+                    f"F1 {best_aegisguard['F1'] * 100:.2f}%",
+                )
+
+            # ------------------------------------------------
+            # EXPORT
+            # ------------------------------------------------
+
+            st.subheader(
+                "📥 Research Export"
+            )
+
+            export_df = (
+                comparison_df.copy()
+            )
+
+            st.download_button(
+                "⬇️ Download Comparison CSV",
+                data=export_df.to_csv(
+                    index=False
+                ),
+                file_name=(
+                    "aegisguard_day25_baseline_comparison.csv"
+                ),
+                mime="text/csv",
+                width="stretch",
+                key="day25_download_comparison",
+            )
+
+            metadata_df = pd.DataFrame(
+                {
+                    "Parameter": [
+                        "Dataset Version",
+                        "Dataset Size",
+                        "Positive Class",
+                        "Negative Class",
+                        "Baseline Threshold",
+                        "AegisGuard Threshold",
+                    ],
+
+                    "Value": [
+                        DATASET_VERSION,
+                        dataset_size,
+                        "MALICIOUS",
+                        "BENIGN + SUSPICIOUS",
+                        baseline_threshold,
+                        aegisguard_threshold,
+                    ],
+                }
+            )
+
+            st.subheader(
+                "🧾 Experiment Metadata"
+            )
+
+            st.dataframe(
+                metadata_df,
+                width="stretch",
+                hide_index=True,
+            )
 
 
 # ============================================================
@@ -2228,12 +1941,10 @@ if show_anomalies:
 
     if anomaly_results:
 
-        anomaly_df = pd.DataFrame(
-            anomaly_results
-        )
-
         st.dataframe(
-            anomaly_df,
+            pd.DataFrame(
+                anomaly_results
+            ),
             width="stretch",
             hide_index=True,
         )
@@ -2295,9 +2006,9 @@ if show_features:
         if available_features:
 
             selected_feature = st.selectbox(
-                "Feature",
+                "Feature to Visualize",
                 available_features,
-                key="feature_selector",
+                key="behavior_feature",
             )
 
             if (
@@ -2305,7 +2016,7 @@ if show_features:
                 in behavior_df.columns
             ):
 
-                st.bar_chart(
+                feature_chart = (
                     behavior_df[
                         [
                             "agent_id",
@@ -2314,19 +2025,23 @@ if show_features:
                     ]
                     .set_index(
                         "agent_id"
-                    ),
+                    )
+                )
+
+                st.bar_chart(
+                    feature_chart,
                     width="stretch",
                 )
 
     else:
 
         st.info(
-            "No behavioral features available."
+            "No behavioral feature data available."
         )
 
 
 # ============================================================
-# INVESTIGATION
+# SECURITY INVESTIGATION
 # ============================================================
 
 if show_investigation:
@@ -2395,9 +2110,9 @@ if show_investigation:
         )
 
     if st.button(
-        "🔍 Investigate",
+        "🔍 Run Investigation",
         type="primary",
-        key="investigate",
+        key="run_investigation",
     ):
 
         try:
@@ -2482,7 +2197,7 @@ if show_agents:
     st.divider()
 
     st.header(
-        "👤 Agent Activity"
+        "👤 Agent Activity Intelligence"
     )
 
     if agents:
@@ -2520,6 +2235,10 @@ if show_agents:
                 )
             )
 
+            st.subheader(
+                "Request Activity"
+            )
+
             st.bar_chart(
                 activity_df,
                 width="stretch",
@@ -2530,6 +2249,64 @@ if show_agents:
         st.info(
             "No agent activity available."
         )
+
+
+# ============================================================
+# SUSPICIOUS AGENTS
+# ============================================================
+
+st.divider()
+
+st.header(
+    "⚠️ Suspicious Agents"
+)
+
+if suspicious_agents:
+
+    suspicious_df = pd.DataFrame(
+        suspicious_agents
+    )
+
+    st.dataframe(
+        suspicious_df,
+        width="stretch",
+        hide_index=True,
+    )
+
+else:
+
+    st.success(
+        "No suspicious agents detected."
+    )
+
+
+# ============================================================
+# REPEATED DENIALS
+# ============================================================
+
+st.divider()
+
+st.header(
+    "🚫 Repeated Denial Patterns"
+)
+
+if repeated_denials:
+
+    denial_df = pd.DataFrame(
+        repeated_denials
+    )
+
+    st.dataframe(
+        denial_df,
+        width="stretch",
+        hide_index=True,
+    )
+
+else:
+
+    st.info(
+        "No repeated denial patterns detected."
+    )
 
 
 # ============================================================
@@ -2546,12 +2323,10 @@ if show_high_risk:
 
     if high_risk_events:
 
-        high_risk_df = pd.DataFrame(
-            high_risk_events
-        )
-
         st.dataframe(
-            high_risk_df,
+            pd.DataFrame(
+                high_risk_events
+            ),
             width="stretch",
             hide_index=True,
         )
@@ -2570,14 +2345,14 @@ if show_high_risk:
 st.divider()
 
 st.header(
-    "🏗️ AegisGuard Research Pipeline"
+    "🏗️ AegisGuard Research Architecture"
 )
 
-arch1, arch2 = (
+architecture_col1, architecture_col2 = (
     st.columns(2)
 )
 
-with arch1:
+with architecture_col1:
 
     st.markdown(
         """
@@ -2587,7 +2362,7 @@ with arch1:
 
         ↓
 
-        Identity
+        Identity / Context
 
         ↓
 
@@ -2599,6 +2374,10 @@ with arch1:
 
         ↓
 
+        Behavioral Analysis
+
+        ↓
+
         ALLOW / DENY
 
         ↓
@@ -2607,17 +2386,17 @@ with arch1:
         """
     )
 
-with arch2:
+with architecture_col2:
 
     st.markdown(
         """
-        ### Research Evaluation Plane
+        ### Experimental Research Plane
 
-        Telemetry
+        Security Telemetry
 
         ↓
 
-        Behavioral Features
+        Feature Engineering
 
         ↓
 
@@ -2637,33 +2416,45 @@ with arch2:
 
         ↓
 
-        Quantitative Metrics
+        Baseline
+
+        ↘
+
+        AegisGuard
 
         ↓
 
-        Threshold Analysis
+        Quantitative Comparison
+
+        ↓
+
+        Repeated Experiments
+
+        ↓
+
+        Statistical Validation
         """
     )
 
 
 # ============================================================
-# DAY 24 RESEARCH MILESTONE
+# DAY 25 MILESTONE
 # ============================================================
 
 st.divider()
 
 st.header(
-    "🔬 Day 24 Research Milestone"
+    "🔬 Day 25 Research Milestone"
 )
 
 st.markdown(
     """
-    ### Quantitative Detection Evaluation
+    ### Baseline Detection Comparison Framework
 
-    AegisGuard now supports controlled measurement of
-    detection performance against known ground-truth events.
+    Day 25 establishes a reproducible experimental framework
+    for comparing AegisGuard against a transparent baseline.
 
-    The evaluation layer measures:
+    **Measured metrics**
 
     - Accuracy
     - Precision
@@ -2672,22 +2463,42 @@ st.markdown(
     - Specificity
     - False-positive rate
     - False-negative rate
-    - Confusion matrix
-    - Risk-threshold sensitivity
-    - Event-level classification
-    - Reproducibility metadata
+    - True positives
+    - True negatives
+    - False positives
+    - False negatives
 
-    This establishes the foundation for the next stage:
-    **baseline comparison and statistically defensible
-    experiments.**
+    **Experimental capabilities**
+
+    - Controlled dataset
+    - Fixed ground truth
+    - Reproducible thresholds
+    - Baseline comparison
+    - Confusion matrices
+    - Threshold sensitivity
+    - Best-threshold analysis
+    - Research metadata
+    - CSV experiment export
+
+    This forms the methodological foundation for the later
+    repeated experiments, ablation studies and statistical
+    validation required for a research-level evaluation.
     """
 )
 
 st.warning(
-    "Current measurements are controlled prototype "
-    "experiments using synthetic data. They must not be "
-    "reported as real-world production performance."
+    "Do not claim that AegisGuard is superior based on one "
+    "synthetic experiment. Later research stages must use "
+    "repeated trials, independent datasets and appropriate "
+    "statistical analysis."
 )
+
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.divider()
 
 st.caption(
     "AegisGuard — Behavior-Aware Security Control Plane "
@@ -2695,5 +2506,5 @@ st.caption(
 )
 
 st.caption(
-    "Day 24 • Quantitative Detection Evaluation"
+    "Research Prototype • Day 25 • Baseline Detection Comparison"
 )

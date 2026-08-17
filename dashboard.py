@@ -3,7 +3,7 @@ import pandas as pd
 
 
 # ============================================================
-# CORE SECURITY ANALYTICS
+# CORE ANALYTICS
 # ============================================================
 
 from app.analytics import (
@@ -26,12 +26,11 @@ from app.behavior import (
 
 
 # ============================================================
-# INVESTIGATION ENGINE
+# INVESTIGATION
 # ============================================================
 
 from app.investigation import (
     get_investigation_events,
-    get_investigation_event,
     get_investigation_filter_options,
 )
 
@@ -87,6 +86,21 @@ from app.attack_scenarios import (
 
 
 # ============================================================
+# DAY 23 — EXPERIMENTAL DATASET
+# ============================================================
+
+from app.experimental_dataset import (
+    DATASET_VERSION,
+    generate_experimental_dataset,
+    summarize_dataset,
+    get_label_distribution,
+    dataset_to_csv,
+    dataset_to_jsonl,
+    validate_dataset,
+)
+
+
+# ============================================================
 # PAGE CONFIGURATION
 # ============================================================
 
@@ -107,6 +121,9 @@ DEFAULT_STATE = {
     "investigation_executed": False,
     "day21_sampled_scenarios": None,
     "day22_attack_experiment": None,
+    "day23_dataset": None,
+    "day23_dataset_summary": None,
+    "day23_dataset_validation": None,
 }
 
 for key, value in DEFAULT_STATE.items():
@@ -119,19 +136,19 @@ for key, value in DEFAULT_STATE.items():
 # HELPER FUNCTIONS
 # ============================================================
 
-def safe_float(value, default=0.0):
+def safe_int(value, default=0):
 
     try:
-        return float(value)
+        return int(value)
 
     except (TypeError, ValueError):
         return default
 
 
-def safe_int(value, default=0):
+def safe_float(value, default=0.0):
 
     try:
-        return int(value)
+        return float(value)
 
     except (TypeError, ValueError):
         return default
@@ -263,7 +280,7 @@ def calculate_agent_intelligence(
     else:
         priority = "LOW"
 
-    recommendations = {
+    recommendation = {
         "CRITICAL":
             "Immediate investigation and containment review",
 
@@ -275,7 +292,7 @@ def calculate_agent_intelligence(
 
         "LOW":
             "Continue normal monitoring",
-    }
+    }[priority]
 
     return {
         "agent_id": agent_id,
@@ -299,8 +316,7 @@ def calculate_agent_intelligence(
             2,
         ),
         "priority": priority,
-        "recommended_action":
-            recommendations[priority],
+        "recommended_action": recommendation,
     }
 
 
@@ -315,7 +331,7 @@ st.title(
 st.caption(
     "Behavior-aware security control plane for "
     "autonomous AI agent authorization, monitoring, "
-    "investigation and controlled experimentation."
+    "investigation and reproducible research."
 )
 
 st.divider()
@@ -338,7 +354,7 @@ with st.sidebar:
     st.divider()
 
     st.subheader(
-        "Dashboard Layers"
+        "Research Modules"
     )
 
     show_overview = st.checkbox(
@@ -358,6 +374,11 @@ with st.sidebar:
 
     show_day22 = st.checkbox(
         "Day 22 Attack Research",
+        value=True,
+    )
+
+    show_day23 = st.checkbox(
+        "Day 23 Dataset Lab",
         value=True,
     )
 
@@ -389,48 +410,62 @@ with st.sidebar:
     st.divider()
 
     st.subheader(
-        "Research Progress"
+        "Research Pipeline"
     )
 
     st.markdown(
         """
         **Days 1–15**
+
         Security Foundation
 
         ↓
 
         **Day 16**
+
         Advanced SOC
 
         ↓
 
         **Day 17**
+
         Investigation
 
         ↓
 
         **Day 18**
+
         Behavioral Features
 
         ↓
 
         **Day 19**
+
         Anomaly Detection
 
         ↓
 
         **Day 20**
+
         Integrated Intelligence
 
         ↓
 
         **Day 21**
+
         Controlled Scenarios
 
         ↓
 
         **Day 22**
-        Attack Scenario Research
+
+        Attack Taxonomy
+
+        ↓
+
+        **Day 23**
+
+        Experimental Dataset
         """
     )
 
@@ -441,12 +476,12 @@ with st.sidebar:
     )
 
     st.caption(
-        "Day 22 • Attack Scenario Framework"
+        f"Dataset Version: {DATASET_VERSION}"
     )
 
 
 # ============================================================
-# LOAD CORE DATA
+# LOAD SECURITY DATA
 # ============================================================
 
 try:
@@ -491,7 +526,7 @@ except Exception:
 
 
 # ============================================================
-# ANOMALIES
+# ANOMALY DATA
 # ============================================================
 
 try:
@@ -528,9 +563,7 @@ anomaly_lookup = {
             "",
         )
     ): item
-
-    for item
-    in anomaly_results
+    for item in anomaly_results
 }
 
 suspicious_lookup = {
@@ -540,9 +573,7 @@ suspicious_lookup = {
             "",
         )
     )
-
-    for item
-    in suspicious_agents
+    for item in suspicious_agents
 }
 
 
@@ -569,7 +600,7 @@ intelligence_df = pd.DataFrame(
 
 
 # ============================================================
-# DAY 16 — SECURITY OVERVIEW
+# SECURITY OVERVIEW
 # ============================================================
 
 if show_overview:
@@ -628,8 +659,6 @@ if show_overview:
                 0,
             ),
         )
-
-    st.divider()
 
     r1, r2, r3, r4 = (
         st.columns(4)
@@ -754,7 +783,7 @@ if show_overview:
 
 
 # ============================================================
-# DAY 20 — INTEGRATED SECURITY INTELLIGENCE
+# DAY 20 — INTEGRATED INTELLIGENCE
 # ============================================================
 
 if show_intelligence:
@@ -766,8 +795,8 @@ if show_intelligence:
     )
 
     st.caption(
-        "Unified prioritization using authorization, "
-        "risk, behavioral and anomaly signals."
+        "Combined authorization, behavioral, risk and "
+        "anomaly signals."
     )
 
     if not intelligence_df.empty:
@@ -775,8 +804,7 @@ if show_intelligence:
         priority_counts = (
             intelligence_df[
                 "priority"
-            ]
-            .value_counts()
+            ].value_counts()
         )
 
         avg_score = round(
@@ -795,7 +823,7 @@ if show_intelligence:
         with i1:
 
             st.metric(
-                "Avg Intelligence",
+                "Average Score",
                 avg_score,
             )
 
@@ -847,44 +875,18 @@ if show_intelligence:
                 ),
             )
 
-        intelligence_view = (
-            intelligence_df
-            .sort_values(
-                "intelligence_score",
-                ascending=False,
-            )
-        )
-
         st.dataframe(
-            intelligence_view,
-            width="stretch",
-            hide_index=True,
-        )
-
-        st.subheader(
-            "Agent Intelligence Scores"
-        )
-
-        st.bar_chart(
-            intelligence_df[
-                [
-                    "agent_id",
-                    "intelligence_score",
-                ]
-            ]
-            .set_index(
-                "agent_id"
-            )
-            .sort_values(
+            intelligence_df.sort_values(
                 "intelligence_score",
                 ascending=False,
             ),
             width="stretch",
+            hide_index=True,
         )
 
 
 # ============================================================
-# DAY 21 — CONTROLLED SECURITY SCENARIOS
+# DAY 21 — CONTROLLED SCENARIO LAB
 # ============================================================
 
 if show_day21:
@@ -892,12 +894,7 @@ if show_day21:
     st.divider()
 
     st.header(
-        "🧪 Day 21 — Controlled Security Scenario Lab"
-    )
-
-    st.caption(
-        "Reproducible benign, suspicious and malicious "
-        "security scenarios."
+        "🧪 Day 21 — Controlled Scenario Lab"
     )
 
     try:
@@ -906,12 +903,7 @@ if show_day21:
             get_scenario_summary()
         )
 
-    except Exception as error:
-
-        st.error(
-            "Unable to load Day 21 scenarios: "
-            f"{error}"
-        )
+    except Exception:
 
         scenario_summary = {
             "total": 0,
@@ -964,7 +956,7 @@ if show_day21:
             ),
         )
 
-    scenario_filter = st.selectbox(
+    scenario_class = st.selectbox(
         "Scenario Class",
         [
             "ALL",
@@ -972,10 +964,10 @@ if show_day21:
             SUSPICIOUS,
             MALICIOUS,
         ],
-        key="day21_filter",
+        key="day21_class_filter",
     )
 
-    if scenario_filter == "ALL":
+    if scenario_class == "ALL":
 
         scenarios = (
             get_scenario_catalog()
@@ -985,7 +977,7 @@ if show_day21:
 
         scenarios = (
             get_scenarios(
-                scenario_filter
+                scenario_class
             )
         )
 
@@ -995,115 +987,15 @@ if show_day21:
             scenarios
         )
 
-        columns = [
-            "scenario_id",
-            "scenario_type",
-            "agent_id",
-            "task_id",
-            "action",
-            "resource",
-            "expected_behavior",
-        ]
-
         st.dataframe(
-            scenario_df[
-                [
-                    c
-                    for c
-                    in columns
-                    if c
-                    in scenario_df.columns
-                ]
-            ],
+            scenario_df,
             width="stretch",
             hide_index=True,
         )
 
-    if scenarios:
-
-        selected_id = st.selectbox(
-            "Inspect Scenario",
-            [
-                item[
-                    "scenario_id"
-                ]
-                for item
-                in scenarios
-            ],
-            key="day21_selected_id",
-        )
-
-        selected = next(
-            (
-                item
-                for item
-                in scenarios
-                if item[
-                    "scenario_id"
-                ]
-                == selected_id
-            ),
-            None,
-        )
-
-        if selected:
-
-            left, right = (
-                st.columns(2)
-            )
-
-            with left:
-
-                st.markdown(
-                    "### Definition"
-                )
-
-                st.write(
-                    "**Agent:** "
-                    f"`{selected['agent_id']}`"
-                )
-
-                st.write(
-                    "**Task:** "
-                    f"`{selected['task_id']}`"
-                )
-
-                st.write(
-                    "**Class:** "
-                    f"`{selected['scenario_type']}`"
-                )
-
-            with right:
-
-                st.markdown(
-                    "### Operation"
-                )
-
-                st.write(
-                    "**Action:** "
-                    f"`{selected['action']}`"
-                )
-
-                st.write(
-                    "**Resource:** "
-                    f"`{selected['resource']}`"
-                )
-
-                st.write(
-                    "**Expected:** "
-                    f"`{selected['expected_behavior']}`"
-                )
-
-            st.info(
-                selected.get(
-                    "description",
-                    "",
-                )
-            )
-
 
 # ============================================================
-# DAY 22 — ATTACK SCENARIO RESEARCH LAB
+# DAY 22 — ATTACK RESEARCH LAB
 # ============================================================
 
 if show_day22:
@@ -1111,40 +1003,17 @@ if show_day22:
     st.divider()
 
     st.header(
-        "⚔️ Day 22 — Controlled Attack Scenario Research Lab"
+        "⚔️ Day 22 — Controlled Attack Research Lab"
     )
 
     st.caption(
-        "Structured attack scenarios for reproducible "
-        "security detection experiments."
+        "Structured attack taxonomy used as the source "
+        "for reproducible research experiments."
     )
 
-    # --------------------------------------------------------
-    # SUMMARY
-    # --------------------------------------------------------
-
-    try:
-
-        attack_summary = (
-            get_attack_scenario_summary()
-        )
-
-    except Exception as error:
-
-        st.error(
-            "Unable to load attack scenarios: "
-            f"{error}"
-        )
-
-        attack_summary = {
-            "total": 0,
-            "malicious": 0,
-            "benign": 0,
-            "critical": 0,
-            "high": 0,
-            "medium": 0,
-            "low": 0,
-        }
+    attack_summary = (
+        get_attack_scenario_summary()
+    )
 
     a1, a2, a3, a4, a5 = (
         st.columns(5)
@@ -1153,7 +1022,7 @@ if show_day22:
     with a1:
 
         st.metric(
-            "Total Scenarios",
+            "Scenarios",
             attack_summary.get(
                 "total",
                 0,
@@ -1200,56 +1069,38 @@ if show_day22:
             ),
         )
 
-    st.divider()
-
-    # --------------------------------------------------------
-    # FILTERS
-    # --------------------------------------------------------
-
-    st.subheader(
-        "Attack Scenario Catalog"
+    attack_type = st.selectbox(
+        "Attack Type",
+        [
+            "ALL"
+        ]
+        + list(
+            ATTACK_SCENARIO_TYPES
+        ),
+        key="day22_type",
     )
 
-    filter1, filter2 = (
-        st.columns(2)
+    attack_severity = st.selectbox(
+        "Severity",
+        [
+            "ALL",
+            "CRITICAL",
+            "HIGH",
+            "MEDIUM",
+            "LOW",
+        ],
+        key="day22_severity",
     )
-
-    with filter1:
-
-        attack_type = st.selectbox(
-            "Attack Type",
-            [
-                "ALL"
-            ]
-            + list(
-                ATTACK_SCENARIO_TYPES
-            ),
-            key="day22_attack_type",
-        )
-
-    with filter2:
-
-        attack_severity = st.selectbox(
-            "Severity",
-            [
-                "ALL",
-                "CRITICAL",
-                "HIGH",
-                "MEDIUM",
-                "LOW",
-            ],
-            key="day22_attack_severity",
-        )
 
     if attack_type == "ALL":
 
-        filtered_attacks = (
+        attacks = (
             get_attack_scenarios()
         )
 
     else:
 
-        filtered_attacks = (
+        attacks = (
             get_attack_scenarios_by_type(
                 attack_type
             )
@@ -1257,27 +1108,23 @@ if show_day22:
 
     if attack_severity != "ALL":
 
-        filtered_attacks = [
-            item
-            for item
-            in filtered_attacks
-            if item[
+        attacks = [
+            attack
+            for attack
+            in attacks
+            if attack[
                 "severity"
             ]
             == attack_severity
         ]
 
-    # --------------------------------------------------------
-    # TABLE
-    # --------------------------------------------------------
-
-    if filtered_attacks:
+    if attacks:
 
         attack_df = pd.DataFrame(
-            filtered_attacks
+            attacks
         )
 
-        display_columns = [
+        columns = [
             "scenario_id",
             "name",
             "scenario_type",
@@ -1287,342 +1134,672 @@ if show_day22:
             "expected_signal",
         ]
 
-        display_columns = [
-            column
-            for column
-            in display_columns
-            if column
-            in attack_df.columns
-        ]
-
         st.dataframe(
             attack_df[
-                display_columns
+                [
+                    column
+                    for column
+                    in columns
+                    if column
+                    in attack_df.columns
+                ]
             ],
             width="stretch",
             hide_index=True,
         )
 
-    else:
 
-        st.info(
-            "No attack scenarios match the selected filters."
+# ============================================================
+# DAY 23 — EXPERIMENTAL DATASET RESEARCH LAB
+# ============================================================
+
+if show_day23:
+
+    st.divider()
+
+    st.header(
+        "🧬 Day 23 — Experimental Dataset Research Lab"
+    )
+
+    st.caption(
+        "Generate, validate, inspect and export reproducible "
+        "security experiments from the controlled attack catalog."
+    )
+
+    # --------------------------------------------------------
+    # RESEARCH OBJECTIVE
+    # --------------------------------------------------------
+
+    with st.expander(
+        "🔬 What is Day 23 doing?",
+        expanded=True,
+    ):
+
+        st.markdown(
+            """
+            Day 23 transforms the controlled security
+            scenarios into a machine-readable experimental
+            dataset.
+
+            Each generated event contains:
+
+            **Scenario → Agent → Task → Action → Resource →
+            Severity → Ground Truth → Risk → Decision →
+            Sequence Position → Timestamp → Experiment Seed**
+
+            The dataset is synthetic and reproducible.
+            It is intended for controlled research evaluation,
+            not as evidence of real-world attack prevalence.
+            """
         )
 
     # --------------------------------------------------------
-    # INVESTIGATION
-    # --------------------------------------------------------
-
-    if filtered_attacks:
-
-        st.subheader(
-            "Attack Scenario Investigation"
-        )
-
-        selected_attack_id = st.selectbox(
-            "Select Attack Scenario",
-            [
-                item[
-                    "scenario_id"
-                ]
-                for item
-                in filtered_attacks
-            ],
-            key="day22_selected_attack",
-        )
-
-        selected_attack = (
-            get_attack_scenario(
-                selected_attack_id
-            )
-        )
-
-        if selected_attack:
-
-            detail1, detail2 = (
-                st.columns(2)
-            )
-
-            with detail1:
-
-                st.markdown(
-                    "### Scenario Definition"
-                )
-
-                st.write(
-                    "**ID:** "
-                    f"`{selected_attack['scenario_id']}`"
-                )
-
-                st.write(
-                    "**Name:** "
-                    f"{selected_attack['name']}"
-                )
-
-                st.write(
-                    "**Category:** "
-                    f"`{selected_attack['scenario_type']}`"
-                )
-
-                st.write(
-                    "**Agent:** "
-                    f"`{selected_attack['agent_id']}`"
-                )
-
-                st.write(
-                    "**Task:** "
-                    f"`{selected_attack['task_id']}`"
-                )
-
-                st.write(
-                    "**Severity:** "
-                    f"`{selected_attack['severity']}`"
-                )
-
-            with detail2:
-
-                st.markdown(
-                    "### Research Ground Truth"
-                )
-
-                st.write(
-                    "**Ground Truth:** "
-                    f"`{selected_attack['ground_truth']}`"
-                )
-
-                st.write(
-                    "**Expected Signal:** "
-                    f"`{selected_attack['expected_signal']}`"
-                )
-
-                st.markdown(
-                    "**Actions**"
-                )
-
-                for action in selected_attack[
-                    "actions"
-                ]:
-
-                    st.code(
-                        action
-                    )
-
-                st.markdown(
-                    "**Resources**"
-                )
-
-                for resource in selected_attack[
-                    "resources"
-                ]:
-
-                    st.code(
-                        resource
-                    )
-
-            st.info(
-                selected_attack[
-                    "description"
-                ]
-            )
-
-            st.success(
-                "Evaluation purpose: "
-                + selected_attack[
-                    "evaluation_purpose"
-                ]
-            )
-
-    # --------------------------------------------------------
-    # REPRODUCIBLE EXPERIMENT
+    # DATASET CONTROLS
     # --------------------------------------------------------
 
     st.subheader(
-        "Reproducible Attack Experiment"
+        "Experimental Configuration"
     )
 
-    e1, e2 = (
-        st.columns(2)
+    d1, d2, d3 = (
+        st.columns(3)
     )
 
-    with e1:
+    with d1:
 
-        attack_count = st.number_input(
-            "Scenario Count",
+        events_per_scenario = st.number_input(
+            "Events per Scenario",
             min_value=1,
-            max_value=8,
-            value=8,
+            max_value=100,
+            value=5,
             step=1,
-            key="day22_attack_count",
+            key="day23_events_per_scenario",
         )
 
-    with e2:
+    with d2:
 
-        attack_seed = st.number_input(
+        experiment_seed = st.number_input(
             "Experiment Seed",
             min_value=0,
             max_value=999999,
             value=42,
             step=1,
-            key="day22_attack_seed",
+            key="day23_seed",
         )
 
-    if st.button(
-        "⚔️ Generate Attack Experiment",
-        key="day22_generate_attack",
-        type="primary",
-    ):
+    with d3:
+
+        dataset_version_display = st.text_input(
+            "Dataset Version",
+            value=DATASET_VERSION,
+            disabled=True,
+            key="day23_version",
+        )
+
+    # --------------------------------------------------------
+    # SOURCE SCENARIOS
+    # --------------------------------------------------------
+
+    source_scenarios = (
+        get_attack_scenarios()
+    )
+
+    st.metric(
+        "Source Attack Scenarios",
+        len(
+            source_scenarios
+        ),
+    )
+
+    # --------------------------------------------------------
+    # GENERATE DATASET
+    # --------------------------------------------------------
+
+    generate_col, validate_col = (
+        st.columns(2)
+    )
+
+    with generate_col:
+
+        generate_dataset = st.button(
+            "🧬 Generate Experimental Dataset",
+            type="primary",
+            use_container_width=True,
+            key="day23_generate",
+        )
+
+    with validate_col:
+
+        validate_existing = st.button(
+            "🔎 Validate Current Dataset",
+            use_container_width=True,
+            key="day23_validate",
+        )
+
+    if generate_dataset:
 
         try:
 
-            generated = (
-                sample_attack_scenarios(
-                    count=int(
-                        attack_count
+            generated_dataset = (
+                generate_experimental_dataset(
+                    scenarios=source_scenarios,
+                    events_per_scenario=int(
+                        events_per_scenario
                     ),
                     seed=int(
-                        attack_seed
+                        experiment_seed
                     ),
                 )
             )
 
             st.session_state[
-                "day22_attack_experiment"
-            ] = pd.DataFrame(
-                generated
+                "day23_dataset"
+            ] = generated_dataset
+
+            st.session_state[
+                "day23_dataset_summary"
+            ] = summarize_dataset(
+                generated_dataset
+            )
+
+            st.session_state[
+                "day23_dataset_validation"
+            ] = validate_dataset(
+                generated_dataset
             )
 
             st.success(
-                "Reproducible attack experiment generated."
+                f"Generated {len(generated_dataset)} "
+                "experimental events successfully."
             )
 
         except Exception as error:
 
             st.error(
-                "Attack experiment failed: "
+                "Dataset generation failed: "
                 f"{error}"
             )
 
     # --------------------------------------------------------
-    # EXPERIMENT OUTPUT
+    # CURRENT DATASET
     # --------------------------------------------------------
 
-    experiment_df = (
+    current_dataset = (
         st.session_state.get(
-            "day22_attack_experiment"
+            "day23_dataset"
         )
     )
 
-    if experiment_df is not None:
+    if current_dataset:
+
+        dataset_summary = (
+            st.session_state.get(
+                "day23_dataset_summary",
+                {},
+            )
+        )
+
+        dataset_validation = (
+            st.session_state.get(
+                "day23_dataset_validation",
+                {},
+            )
+        )
+
+        st.divider()
 
         st.subheader(
-            "Generated Experimental Dataset"
+            "Dataset Overview"
+        )
+
+        m1, m2, m3, m4, m5 = (
+            st.columns(5)
+        )
+
+        with m1:
+
+            st.metric(
+                "Events",
+                dataset_summary.get(
+                    "total_events",
+                    len(
+                        current_dataset
+                    ),
+                ),
+            )
+
+        with m2:
+
+            st.metric(
+                "Benign",
+                dataset_summary.get(
+                    "benign_events",
+                    0,
+                ),
+            )
+
+        with m3:
+
+            st.metric(
+                "Suspicious",
+                dataset_summary.get(
+                    "suspicious_events",
+                    0,
+                ),
+            )
+
+        with m4:
+
+            st.metric(
+                "Malicious",
+                dataset_summary.get(
+                    "malicious_events",
+                    0,
+                ),
+            )
+
+        with m5:
+
+            st.metric(
+                "Average Risk",
+                dataset_summary.get(
+                    "average_risk",
+                    0,
+                ),
+            )
+
+        # ----------------------------------------------------
+        # VALIDATION STATUS
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Dataset Integrity"
+        )
+
+        validation_col1, validation_col2 = (
+            st.columns(2)
+        )
+
+        with validation_col1:
+
+            if dataset_validation.get(
+                "valid",
+                False,
+            ):
+
+                st.success(
+                    "✅ Dataset validation passed"
+                )
+
+            else:
+
+                st.error(
+                    "❌ Dataset validation failed"
+                )
+
+        with validation_col2:
+
+            st.write(
+                "**Rows:** "
+                f"{dataset_validation.get('total_rows', 0)}"
+            )
+
+            st.write(
+                "**Labels valid:** "
+                f"{dataset_validation.get('labels_valid', False)}"
+            )
+
+            st.write(
+                "**Risk scores valid:** "
+                f"{dataset_validation.get('risk_scores_valid', False)}"
+            )
+
+            st.write(
+                "**Decisions valid:** "
+                f"{dataset_validation.get('decisions_valid', False)}"
+            )
+
+        # ----------------------------------------------------
+        # LABEL DISTRIBUTION
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Ground-Truth Distribution"
+        )
+
+        label_distribution = (
+            get_label_distribution(
+                current_dataset
+            )
+        )
+
+        label_df = pd.DataFrame(
+            {
+                "Ground Truth": [
+                    "BENIGN",
+                    "SUSPICIOUS",
+                    "MALICIOUS",
+                ],
+
+                "Count": [
+                    label_distribution.get(
+                        "BENIGN",
+                        0,
+                    ),
+
+                    label_distribution.get(
+                        "SUSPICIOUS",
+                        0,
+                    ),
+
+                    label_distribution.get(
+                        "MALICIOUS",
+                        0,
+                    ),
+                ],
+            }
+        )
+
+        chart_col, distribution_col = (
+            st.columns(2)
+        )
+
+        with chart_col:
+
+            st.bar_chart(
+                label_df.set_index(
+                    "Ground Truth"
+                ),
+                width="stretch",
+            )
+
+        with distribution_col:
+
+            st.dataframe(
+                label_df,
+                width="stretch",
+                hide_index=True,
+            )
+
+            total_labels = sum(
+                label_distribution.values()
+            )
+
+            if total_labels:
+
+                benign_ratio = (
+                    label_distribution[
+                        "BENIGN"
+                    ]
+                    / total_labels
+                    * 100
+                )
+
+                suspicious_ratio = (
+                    label_distribution[
+                        "SUSPICIOUS"
+                    ]
+                    / total_labels
+                    * 100
+                )
+
+                malicious_ratio = (
+                    label_distribution[
+                        "MALICIOUS"
+                    ]
+                    / total_labels
+                    * 100
+                )
+
+                st.write(
+                    f"Benign: **{benign_ratio:.1f}%**"
+                )
+
+                st.write(
+                    f"Suspicious: **{suspicious_ratio:.1f}%**"
+                )
+
+                st.write(
+                    f"Malicious: **{malicious_ratio:.1f}%**"
+                )
+
+        # ----------------------------------------------------
+        # DATASET PREVIEW
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Experimental Dataset Preview"
+        )
+
+        dataset_df = pd.DataFrame(
+            current_dataset
+        )
+
+        preview_count = st.slider(
+            "Preview Rows",
+            min_value=5,
+            max_value=min(
+                100,
+                len(
+                    dataset_df
+                ),
+            ),
+            value=min(
+                20,
+                len(
+                    dataset_df
+                ),
+            ),
+            key="day23_preview_rows",
         )
 
         st.dataframe(
-            experiment_df,
+            dataset_df.head(
+                preview_count
+            ),
             width="stretch",
             hide_index=True,
         )
 
-        attack_csv = (
-            experiment_df
-            .to_csv(
-                index=False
-            )
-            .encode(
-                "utf-8"
-            )
+        # ----------------------------------------------------
+        # DATASET FILTER
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Research Dataset Explorer"
         )
 
-        st.download_button(
-            "⬇️ Export Attack Experiment",
-            data=attack_csv,
-            file_name=(
-                "aegisguard_day22_attack_scenarios.csv"
-            ),
-            mime="text/csv",
-            key="day22_export",
+        filter_col1, filter_col2, filter_col3 = (
+            st.columns(3)
         )
 
-    # --------------------------------------------------------
-    # SEVERITY DISTRIBUTION
-    # --------------------------------------------------------
+        with filter_col1:
 
-    st.subheader(
-        "Attack Severity Distribution"
-    )
+            selected_label = st.selectbox(
+                "Ground Truth",
+                [
+                    "ALL",
+                    "BENIGN",
+                    "SUSPICIOUS",
+                    "MALICIOUS",
+                ],
+                key="day23_label_filter",
+            )
 
-    severity_df = pd.DataFrame(
-        {
-            "Severity": [
-                "CRITICAL",
-                "HIGH",
-                "MEDIUM",
-                "LOW",
-            ],
+        with filter_col2:
 
-            "Count": [
-                attack_summary.get(
-                    "critical",
-                    0,
+            selected_decision = st.selectbox(
+                "Decision",
+                [
+                    "ALL",
+                    "ALLOW",
+                    "DENY",
+                ],
+                key="day23_decision_filter",
+            )
+
+        with filter_col3:
+
+            min_risk = st.slider(
+                "Minimum Risk",
+                min_value=0,
+                max_value=100,
+                value=0,
+                step=5,
+                key="day23_min_risk",
+            )
+
+        filtered_df = dataset_df.copy()
+
+        if selected_label != "ALL":
+
+            filtered_df = filtered_df[
+                filtered_df[
+                    "ground_truth"
+                ]
+                == selected_label
+            ]
+
+        if selected_decision != "ALL":
+
+            filtered_df = filtered_df[
+                filtered_df[
+                    "decision"
+                ]
+                == selected_decision
+            ]
+
+        if "risk_score" in filtered_df.columns:
+
+            filtered_df = filtered_df[
+                filtered_df[
+                    "risk_score"
+                ]
+                >= min_risk
+            ]
+
+        st.write(
+            f"Matching events: **{len(filtered_df)}**"
+        )
+
+        st.dataframe(
+            filtered_df,
+            width="stretch",
+            hide_index=True,
+        )
+
+        # ----------------------------------------------------
+        # EXPORT
+        # ----------------------------------------------------
+
+        st.subheader(
+            "Research Dataset Export"
+        )
+
+        export_col1, export_col2 = (
+            st.columns(2)
+        )
+
+        with export_col1:
+
+            csv_data = dataset_to_csv(
+                current_dataset
+            )
+
+            st.download_button(
+                "⬇️ Download CSV Dataset",
+                data=csv_data,
+                file_name=(
+                    "aegisguard_day23_experimental_dataset.csv"
                 ),
+                mime="text/csv",
+                use_container_width=True,
+                key="day23_csv_download",
+            )
 
-                attack_summary.get(
-                    "high",
-                    0,
+        with export_col2:
+
+            jsonl_data = dataset_to_jsonl(
+                current_dataset
+            )
+
+            st.download_button(
+                "⬇️ Download JSONL Dataset",
+                data=jsonl_data,
+                file_name=(
+                    "aegisguard_day23_experimental_dataset.jsonl"
                 ),
+                mime="application/json",
+                use_container_width=True,
+                key="day23_jsonl_download",
+            )
 
-                attack_summary.get(
-                    "medium",
-                    0,
-                ),
+        # ----------------------------------------------------
+        # REPRODUCIBILITY
+        # ----------------------------------------------------
 
-                attack_summary.get(
-                    "low",
-                    0,
-                ),
-            ],
-        }
-    )
+        st.subheader(
+            "🔁 Reproducibility Metadata"
+        )
 
-    st.bar_chart(
-        severity_df.set_index(
-            "Severity"
-        ),
-        width="stretch",
-    )
+        reproducibility_df = pd.DataFrame(
+            {
+                "Parameter": [
+                    "Dataset Version",
+                    "Experiment Seed",
+                    "Events per Scenario",
+                    "Scenario Count",
+                    "Total Events",
+                ],
 
-    # --------------------------------------------------------
-    # RESEARCH SIGNIFICANCE
-    # --------------------------------------------------------
+                "Value": [
+                    DATASET_VERSION,
+                    experiment_seed,
+                    events_per_scenario,
+                    len(
+                        source_scenarios
+                    ),
+                    len(
+                        current_dataset
+                    ),
+                ],
+            }
+        )
 
-    st.subheader(
-        "Day 22 Research Significance"
-    )
+        st.dataframe(
+            reproducibility_df,
+            width="stretch",
+            hide_index=True,
+        )
 
-    st.markdown(
-        """
-        Day 22 introduces a structured attack taxonomy
-        for controlled security evaluation.
+        st.info(
+            "Using the same scenario catalog, events-per-scenario "
+            "value and experiment seed should reproduce the "
+            "same synthetic dataset."
+        )
 
-        Each scenario defines:
+        # ----------------------------------------------------
+        # RESEARCH LIMITATION
+        # ----------------------------------------------------
 
-        **Attack Type → Agent → Task → Actions → Resources
-        → Severity → Ground Truth → Expected Signal**
+        st.warning(
+            "Research limitation: this dataset is synthetic "
+            "and controlled. It should not be presented as "
+            "evidence of real-world attack prevalence or "
+            "production detection performance."
+        )
 
-        The framework deliberately includes legitimate
-        high-volume activity so that future experiments
-        can measure false-positive behavior rather than
-        evaluating only obvious malicious cases.
+    else:
 
-        These scenarios form the basis for the experimental
-        dataset and evaluation pipeline planned for Days 23–30.
-        """
-    )
+        st.info(
+            "No experimental dataset has been generated yet. "
+            "Configure the experiment above and click "
+            "'Generate Experimental Dataset'."
+        )
 
 
 # ============================================================
-# DAY 19 — ANOMALY DETECTION
+# ANOMALY DETECTION
 # ============================================================
 
 if show_anomalies:
@@ -1633,11 +1810,11 @@ if show_anomalies:
         "🚨 Behavioral Anomaly Detection"
     )
 
-    an1, an2, an3, an4 = (
+    a1, a2, a3, a4 = (
         st.columns(4)
     )
 
-    with an1:
+    with a1:
 
         st.metric(
             "Agents Analyzed",
@@ -1647,7 +1824,7 @@ if show_anomalies:
             ),
         )
 
-    with an2:
+    with a2:
 
         st.metric(
             "High Anomaly",
@@ -1657,7 +1834,7 @@ if show_anomalies:
             ),
         )
 
-    with an3:
+    with a3:
 
         st.metric(
             "Medium Anomaly",
@@ -1667,7 +1844,7 @@ if show_anomalies:
             ),
         )
 
-    with an4:
+    with a4:
 
         st.metric(
             "Normal",
@@ -1712,14 +1889,6 @@ if show_anomalies:
                                 0,
                             )
                         ),
-
-                    "Critical Requests":
-                        safe_int(
-                            item.get(
-                                "critical_requests",
-                                0,
-                            )
-                        ),
                 }
             )
 
@@ -1735,7 +1904,7 @@ if show_anomalies:
 
 
 # ============================================================
-# DAY 18 — BEHAVIORAL FEATURES
+# BEHAVIORAL FEATURES
 # ============================================================
 
 if show_features:
@@ -1771,32 +1940,29 @@ if show_features:
                 get_behavior_feature_names()
             )
 
-            available_features = [
-                feature
-                for feature
-                in feature_names
-                if feature
-                in behavior_df.columns
-            ]
-
         except Exception:
 
-            available_features = [
+            feature_names = [
                 column
                 for column
                 in behavior_df.columns
-                if column
-                != "agent_id"
+                if column != "agent_id"
             ]
+
+        available_features = [
+            feature
+            for feature
+            in feature_names
+            if feature
+            in behavior_df.columns
+        ]
 
         if available_features:
 
-            selected_feature = (
-                st.selectbox(
-                    "Explore Feature",
-                    available_features,
-                    key="feature_explorer",
-                )
+            selected_feature = st.selectbox(
+                "Explore Feature",
+                available_features,
+                key="day18_feature",
             )
 
             if (
@@ -1825,7 +1991,7 @@ if show_features:
 
 
 # ============================================================
-# DAY 17 — INVESTIGATION
+# INVESTIGATION
 # ============================================================
 
 if show_investigation:
@@ -1855,54 +2021,48 @@ if show_investigation:
 
     with inv1:
 
-        investigation_agent = (
-            st.selectbox(
-                "Agent",
-                [
-                    "ALL"
-                ]
-                + filter_options.get(
-                    "agents",
-                    [],
-                ),
-                key="investigation_agent",
-            )
+        selected_agent = st.selectbox(
+            "Agent",
+            [
+                "ALL"
+            ]
+            + filter_options.get(
+                "agents",
+                [],
+            ),
+            key="investigation_agent",
         )
 
     with inv2:
 
-        investigation_action = (
-            st.selectbox(
-                "Action",
-                [
-                    "ALL"
-                ]
-                + filter_options.get(
-                    "actions",
-                    [],
-                ),
-                key="investigation_action",
-            )
+        selected_action = st.selectbox(
+            "Action",
+            [
+                "ALL"
+            ]
+            + filter_options.get(
+                "actions",
+                [],
+            ),
+            key="investigation_action",
         )
 
     with inv3:
 
-        investigation_decision = (
-            st.selectbox(
-                "Decision",
-                [
-                    "ALL",
-                    "ALLOW",
-                    "DENY",
-                ],
-                key="investigation_decision",
-            )
+        selected_decision = st.selectbox(
+            "Decision",
+            [
+                "ALL",
+                "ALLOW",
+                "DENY",
+            ],
+            key="investigation_decision",
         )
 
     if st.button(
         "🔍 Investigate Events",
         type="primary",
-        key="run_investigation",
+        key="investigate_events",
     ):
 
         try:
@@ -1911,23 +2071,23 @@ if show_investigation:
                 get_investigation_events(
                     agent_id=(
                         None
-                        if investigation_agent
+                        if selected_agent
                         == "ALL"
-                        else investigation_agent
+                        else selected_agent
                     ),
 
                     action=(
                         None
-                        if investigation_action
+                        if selected_action
                         == "ALL"
-                        else investigation_action
+                        else selected_action
                     ),
 
                     decision=(
                         None
-                        if investigation_decision
+                        if selected_decision
                         == "ALL"
-                        else investigation_decision
+                        else selected_decision
                     ),
 
                     limit=100,
@@ -1949,11 +2109,9 @@ if show_investigation:
                 f"{error}"
             )
 
-    if (
-        st.session_state[
-            "investigation_executed"
-        ]
-    ):
+    if st.session_state[
+        "investigation_executed"
+    ]:
 
         results = st.session_state[
             "investigation_results"
@@ -1981,7 +2139,7 @@ if show_investigation:
         else:
 
             st.info(
-                "No events matched the investigation criteria."
+                "No matching events found."
             )
 
 
@@ -2009,12 +2167,12 @@ if show_agents:
             hide_index=True,
         )
 
-        required_agent_columns = {
+        required_columns = {
             "total_requests",
             "denied_requests",
         }
 
-        if required_agent_columns.issubset(
+        if required_columns.issubset(
             agent_df.columns
         ):
 
@@ -2084,11 +2242,11 @@ st.header(
     "🏗️ AegisGuard Research Architecture"
 )
 
-architecture_left, architecture_right = (
+architecture1, architecture2 = (
     st.columns(2)
 )
 
-with architecture_left:
+with architecture1:
 
     st.markdown(
         """
@@ -2118,11 +2276,11 @@ with architecture_left:
         """
     )
 
-with architecture_right:
+with architecture2:
 
     st.markdown(
         """
-        ### Research Intelligence
+        ### Research Intelligence Pipeline
 
         Security Telemetry
 
@@ -2144,7 +2302,11 @@ with architecture_right:
 
         ↓
 
-        Attack Experiments
+        Attack Taxonomy
+
+        ↓
+
+        Experimental Dataset
 
         ↓
 
@@ -2154,60 +2316,43 @@ with architecture_right:
 
 
 # ============================================================
-# DAY 22 RESEARCH MILESTONE
+# DAY 23 MILESTONE
 # ============================================================
 
 st.divider()
 
 st.header(
-    "🔬 Day 22 Research Milestone"
+    "🔬 Day 23 Research Milestone"
 )
 
 st.markdown(
     """
-    **Controlled Attack Scenario Framework**
+    ### Reproducible Experimental Dataset
 
-    Day 22 extends the controlled scenario system into a
-    structured attack taxonomy.
+    AegisGuard can now transform controlled security
+    scenarios into structured experimental events.
 
-    The experimental framework now distinguishes:
+    Each event records:
 
-    - Direct unauthorized access
-    - Repeated authorization abuse
-    - Privilege expansion
-    - High-risk request bursts
-    - Resource enumeration
-    - Behavioral drift
-    - Legitimate high-volume activity
-    - Multi-stage attack sequences
+    **Scenario → Agent → Action → Resource → Severity →
+    Ground Truth → Risk → Decision → Sequence →
+    Timestamp → Experiment Seed**
 
-    Every scenario has an explicit ground-truth label,
-    severity classification and expected security signal.
+    This establishes the data foundation required for
+    quantitative evaluation in the next research phase.
 
-    This makes the scenarios suitable for controlled
-    experimental evaluation during the next phase of
-    AegisGuard development.
+    The generated dataset supports:
+
+    - Reproducible experiments
+    - Ground-truth classification
+    - Risk analysis
+    - Authorization outcome analysis
+    - Behavioral evaluation
+    - CSV export
+    - JSONL export
+    - Dataset integrity validation
     """
 )
-
-
-# ============================================================
-# RESEARCH WARNING
-# ============================================================
-
-st.warning(
-    "Research limitation: these are controlled synthetic "
-    "scenarios. They must not be presented as evidence of "
-    "real-world attack detection until validated through "
-    "appropriate datasets, experiments and statistical analysis."
-)
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.divider()
 
 st.caption(
     "AegisGuard — Behavior-Aware Security Control Plane "
@@ -2215,5 +2360,5 @@ st.caption(
 )
 
 st.caption(
-    "Research Prototype • Day 22 • Controlled Attack Scenarios"
+    "Day 23 • Experimental Dataset Generation"
 )

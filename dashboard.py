@@ -13,7 +13,7 @@ import streamlit as st
 
 # ============================================================
 # AEGISGUARD
-# UNIFIED DAY 1–29 SECURITY + RESEARCH DASHBOARD
+# UNIFIED DAY 1–30 SECURITY + RESEARCH DASHBOARD
 # ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -21,6 +21,10 @@ APP_DIR = PROJECT_ROOT / "app"
 TESTS_DIR = PROJECT_ROOT / "tests"
 EXPECTED_ENV = Path(r"D:\aegisguard-env").resolve()
 
+
+# ============================================================
+# PAGE CONFIGURATION
+# ============================================================
 
 st.set_page_config(
     page_title="AegisGuard Intelligence SOC",
@@ -40,6 +44,7 @@ def safe_call(
     *args: Any,
     **kwargs: Any,
 ) -> Any:
+    """Safely execute an optional project function."""
     if function is None:
         return default
 
@@ -50,12 +55,19 @@ def safe_call(
 
 
 def as_dict(value: Any) -> dict[str, Any]:
+    """Convert common project objects into dictionaries."""
     if isinstance(value, dict):
         return dict(value)
 
     if hasattr(value, "model_dump"):
         try:
             return dict(value.model_dump())
+        except Exception:
+            pass
+
+    if hasattr(value, "dict"):
+        try:
+            return dict(value.dict())
         except Exception:
             pass
 
@@ -68,15 +80,16 @@ def as_dict(value: Any) -> dict[str, Any]:
     return {}
 
 
-def dataframe_or_empty(rows: Any) -> pd.DataFrame:
-    if rows is None:
+def dataframe_or_empty(value: Any) -> pd.DataFrame:
+    """Safely convert arbitrary rows into a DataFrame."""
+    if value is None:
         return pd.DataFrame()
 
-    if isinstance(rows, pd.DataFrame):
-        return rows.copy()
+    if isinstance(value, pd.DataFrame):
+        return value.copy()
 
     try:
-        return pd.DataFrame(rows)
+        return pd.DataFrame(value)
     except Exception:
         return pd.DataFrame()
 
@@ -85,6 +98,7 @@ def safe_number(
     value: Any,
     default: float = 0.0,
 ) -> float:
+    """Safely convert a value to float."""
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -92,30 +106,55 @@ def safe_number(
 
 
 def format_percent(value: Any) -> str:
+    """Format a 0–1 metric as a percentage."""
     return f"{safe_number(value) * 100:.2f}%"
 
 
 def download_dataframe(
     dataframe: pd.DataFrame,
     filename: str,
+    key: str | None = None,
 ) -> None:
-
+    """Create a CSV download button when data exists."""
     if dataframe.empty:
         return
 
-    csv_data = (
-        dataframe
-        .to_csv(index=False)
-        .encode("utf-8")
-    )
+    csv_data = dataframe.to_csv(
+        index=False
+    ).encode("utf-8")
 
     st.download_button(
         label="⬇️ Download CSV",
         data=csv_data,
         file_name=filename,
         mime="text/csv",
-        key=f"download_{filename}",
+        key=key or f"download_{filename}",
     )
+
+
+def extract_scalar_rows(
+    data: Any,
+) -> list[dict[str, Any]]:
+    """Extract scalar dictionary values for dashboard tables."""
+    if not isinstance(data, dict):
+        return []
+
+    rows = []
+
+    for key, value in data.items():
+
+        if isinstance(
+            value,
+            (str, int, float, bool),
+        ):
+            rows.append(
+                {
+                    "Metric": key,
+                    "Value": value,
+                }
+            )
+
+    return rows
 
 
 # ============================================================
@@ -131,6 +170,7 @@ def load_modules() -> dict[str, Any]:
     # --------------------------------------------------------
 
     try:
+
         from app.analytics import (
             get_total_events,
             get_decision_counts,
@@ -140,21 +180,32 @@ def load_modules() -> dict[str, Any]:
         )
 
         modules["analytics"] = {
-            "get_total_events": get_total_events,
-            "get_decision_counts": get_decision_counts,
-            "get_risk_summary": get_risk_summary,
-            "get_agent_activity": get_agent_activity,
-            "get_high_risk_events": get_high_risk_events,
+            "get_total_events":
+                get_total_events,
+
+            "get_decision_counts":
+                get_decision_counts,
+
+            "get_risk_summary":
+                get_risk_summary,
+
+            "get_agent_activity":
+                get_agent_activity,
+
+            "get_high_risk_events":
+                get_high_risk_events,
         }
 
     except Exception as exc:
+
         modules["analytics_error"] = str(exc)
 
     # --------------------------------------------------------
-    # Behavior
+    # Behavioral analytics
     # --------------------------------------------------------
 
     try:
+
         from app.behavior import (
             get_suspicious_agents,
             get_repeated_denials,
@@ -163,18 +214,21 @@ def load_modules() -> dict[str, Any]:
         modules["behavior"] = {
             "get_suspicious_agents":
                 get_suspicious_agents,
+
             "get_repeated_denials":
                 get_repeated_denials,
         }
 
     except Exception as exc:
+
         modules["behavior_error"] = str(exc)
 
     # --------------------------------------------------------
-    # Scenarios
+    # Attack scenarios
     # --------------------------------------------------------
 
     try:
+
         from app.attack_scenarios import (
             get_attack_scenarios,
             get_attack_scenario_summary,
@@ -183,11 +237,13 @@ def load_modules() -> dict[str, Any]:
         modules["scenarios"] = {
             "get_attack_scenarios":
                 get_attack_scenarios,
+
             "get_attack_scenario_summary":
                 get_attack_scenario_summary,
         }
 
     except Exception as exc:
+
         modules["scenarios_error"] = str(exc)
 
     # --------------------------------------------------------
@@ -195,11 +251,13 @@ def load_modules() -> dict[str, Any]:
     # --------------------------------------------------------
 
     try:
+
         import app.investigation as investigation
 
         modules["investigation"] = investigation
 
     except Exception as exc:
+
         modules["investigation_error"] = str(exc)
 
     # --------------------------------------------------------
@@ -207,6 +265,7 @@ def load_modules() -> dict[str, Any]:
     # --------------------------------------------------------
 
     try:
+
         from app.experimental_dataset import (
             generate_experimental_dataset,
         )
@@ -217,25 +276,29 @@ def load_modules() -> dict[str, Any]:
         }
 
     except Exception as exc:
+
         modules["dataset_error"] = str(exc)
 
     # --------------------------------------------------------
-    # Detection evaluation
+    # Evaluation
     # --------------------------------------------------------
 
     try:
+
         import app.evaluation as evaluation
 
         modules["evaluation"] = evaluation
 
     except Exception as exc:
+
         modules["evaluation_error"] = str(exc)
 
     # --------------------------------------------------------
-    # Comparison
+    # Baseline comparison
     # --------------------------------------------------------
 
     try:
+
         from app.comparison import (
             compare_detectors,
             build_comparison_table,
@@ -254,6 +317,7 @@ def load_modules() -> dict[str, Any]:
         }
 
     except Exception as exc:
+
         modules["comparison_error"] = str(exc)
 
     # --------------------------------------------------------
@@ -261,6 +325,7 @@ def load_modules() -> dict[str, Any]:
     # --------------------------------------------------------
 
     try:
+
         from app.repeated_evaluation import (
             run_repeated_experiments,
             build_seed_summary,
@@ -283,43 +348,64 @@ def load_modules() -> dict[str, Any]:
         }
 
     except Exception as exc:
+
         modules["repeated_error"] = str(exc)
 
     # --------------------------------------------------------
-    # Statistical evaluation — Day 28
+    # Statistical evaluation
     # --------------------------------------------------------
 
     try:
+
         import app.statistical_evaluation as statistical
 
         modules["statistical"] = statistical
 
     except Exception as exc:
+
         modules["statistical_error"] = str(exc)
 
     # --------------------------------------------------------
-    # Multi-resolution behavior — Day 28
+    # Multi-resolution behavior
     # --------------------------------------------------------
 
     try:
+
         import app.multiresolution_behavior as multiresolution
 
         modules["multiresolution"] = multiresolution
 
     except Exception as exc:
+
         modules["multiresolution_error"] = str(exc)
 
     # --------------------------------------------------------
-    # Cross-context correlation — Day 29
+    # Cross-context correlation
     # --------------------------------------------------------
 
     try:
+
         import app.cross_context_correlation as cross_context
 
         modules["cross_context"] = cross_context
 
     except Exception as exc:
+
         modules["cross_context_error"] = str(exc)
+
+    # --------------------------------------------------------
+    # Day 30 — Adaptive Runtime Response
+    # --------------------------------------------------------
+
+    try:
+
+        import app.adaptive_response as adaptive_response
+
+        modules["adaptive_response"] = adaptive_response
+
+    except Exception as exc:
+
+        modules["adaptive_response_error"] = str(exc)
 
     return modules
 
@@ -332,19 +418,50 @@ MODULES = load_modules()
 # ============================================================
 
 DEFAULT_STATE = {
-    "selected_agent": None,
-    "selected_event": None,
-    "experimental_dataset": None,
-    "day26_results": None,
-    "day26_dataset": None,
-    "day27_results": None,
-    "day27_config": None,
-    "day28_profile": None,
-    "day28_events": None,
-    "day29_profile": None,
-    "day29_summary": None,
-    "day29_events": None,
-    "test_result": None,
+    "selected_agent":
+        None,
+
+    "selected_event":
+        None,
+
+    "experimental_dataset":
+        None,
+
+    "day26_results":
+        None,
+
+    "day26_dataset":
+        None,
+
+    "day27_results":
+        None,
+
+    "day27_config":
+        None,
+
+    "day28_profile":
+        None,
+
+    "day28_events":
+        None,
+
+    "day29_profile":
+        None,
+
+    "day29_summary":
+        None,
+
+    "day29_events":
+        None,
+
+    "day30_result":
+        None,
+
+    "day30_evidence":
+        None,
+
+    "test_result":
+        None,
 }
 
 
@@ -356,7 +473,7 @@ for key, value in DEFAULT_STATE.items():
 
 
 # ============================================================
-# UI
+# VISUAL STYLE
 # ============================================================
 
 st.markdown(
@@ -376,7 +493,7 @@ st.markdown(
         margin-bottom: 1.4rem;
     }
 
-    .card {
+    .research-card {
         border: 1px solid rgba(128,128,128,0.22);
         border-radius: 14px;
         padding: 18px;
@@ -396,7 +513,7 @@ st.markdown(
 
 
 # ============================================================
-# LOAD CURRENT DATA
+# CURRENT SECURITY DATA
 # ============================================================
 
 analytics = MODULES.get(
@@ -416,49 +533,65 @@ scenarios_module = MODULES.get(
 
 
 total_events = safe_call(
-    analytics.get("get_total_events"),
+    analytics.get(
+        "get_total_events"
+    ),
     0,
 )
 
 
 decision_counts = safe_call(
-    analytics.get("get_decision_counts"),
+    analytics.get(
+        "get_decision_counts"
+    ),
     {},
 )
 
 
 risk_summary = safe_call(
-    analytics.get("get_risk_summary"),
+    analytics.get(
+        "get_risk_summary"
+    ),
     {},
 )
 
 
 agent_activity = safe_call(
-    analytics.get("get_agent_activity"),
+    analytics.get(
+        "get_agent_activity"
+    ),
     [],
 )
 
 
 high_risk_events = safe_call(
-    analytics.get("get_high_risk_events"),
+    analytics.get(
+        "get_high_risk_events"
+    ),
     [],
 )
 
 
 suspicious_agents = safe_call(
-    behavior.get("get_suspicious_agents"),
+    behavior.get(
+        "get_suspicious_agents"
+    ),
     [],
 )
 
 
 repeated_denials = safe_call(
-    behavior.get("get_repeated_denials"),
+    behavior.get(
+        "get_repeated_denials"
+    ),
     [],
 )
 
 
 scenario_catalogue = safe_call(
-    scenarios_module.get("get_attack_scenarios"),
+    scenarios_module.get(
+        "get_attack_scenarios"
+    ),
     [],
 )
 
@@ -478,9 +611,9 @@ st.markdown(
     """
     <div class="main-subtitle">
     Behavior-aware security intelligence for autonomous AI agents —
-    authorization, contextual risk, behavioral monitoring,
-    controlled scenarios, reproducible evaluation,
-    statistical analysis and cross-context intelligence.
+    authorization, risk assessment, behavioral monitoring,
+    multi-resolution analysis, cross-context intelligence,
+    adaptive runtime response and reproducible research evaluation.
     </div>
     """,
     unsafe_allow_html=True,
@@ -488,10 +621,12 @@ st.markdown(
 
 
 # ============================================================
-# SIDEBAR
+# SIDEBAR NAVIGATION
 # ============================================================
 
-st.sidebar.title("🛡️ AegisGuard")
+st.sidebar.title(
+    "🛡️ AegisGuard"
+)
 
 st.sidebar.caption(
     "AI Agent Security Research Platform"
@@ -501,23 +636,43 @@ st.sidebar.divider()
 
 
 NAVIGATION = [
+
     "🏠 Security Overview",
+
     "📈 Risk Intelligence",
+
     "🤖 Agent Intelligence",
+
     "🧠 Behavioral Analytics",
+
     "🚨 High-Risk Events",
+
     "🔎 Security Investigation",
+
     "🧪 Scenario Laboratory",
+
     "🧬 Experimental Dataset",
+
     "📊 Day 24 Evaluation",
+
     "⚖️ Day 26 Baseline Comparison",
+
     "🔬 Day 27 Repeated Evaluation",
+
     "📐 Day 28 Statistical Evaluation",
+
     "🧬 Day 28 Multi-Resolution Behavior",
+
     "🔗 Day 29 Cross-Context Intelligence",
+
+    "🛡️ Day 30 Adaptive Runtime Response",
+
     "📚 Research Interpretation",
+
     "📅 Project Construction",
+
     "🚀 Deployment & Validation",
+
     "⚙️ System Status",
 ]
 
@@ -536,13 +691,13 @@ st.sidebar.markdown(
 
 st.sidebar.caption(
     "Authorize → Observe → Understand → "
-    "Detect → Evaluate → Correlate → Defend"
+    "Detect → Evaluate → Correlate → Adapt"
 )
 
 st.sidebar.divider()
 
 st.sidebar.caption(
-    "Current milestone: Day 29"
+    "Current milestone: Day 30"
 )
 
 
@@ -559,12 +714,14 @@ if dashboard_view == "🏠 Security Overview":
     c1, c2, c3, c4, c5 = st.columns(5)
 
     with c1:
+
         st.metric(
             "Total Events",
             total_events,
         )
 
     with c2:
+
         st.metric(
             "Allowed",
             decision_counts.get(
@@ -574,6 +731,7 @@ if dashboard_view == "🏠 Security Overview":
         )
 
     with c3:
+
         st.metric(
             "Denied",
             decision_counts.get(
@@ -583,6 +741,7 @@ if dashboard_view == "🏠 Security Overview":
         )
 
     with c4:
+
         st.metric(
             "Average Risk",
             risk_summary.get(
@@ -592,6 +751,7 @@ if dashboard_view == "🏠 Security Overview":
         )
 
     with c5:
+
         st.metric(
             "Critical",
             risk_summary.get(
@@ -627,6 +787,7 @@ if dashboard_view == "🏠 Security Overview":
         )
 
         with left:
+
             st.dataframe(
                 decision_df,
                 width="stretch",
@@ -634,6 +795,7 @@ if dashboard_view == "🏠 Security Overview":
             )
 
         with right:
+
             st.bar_chart(
                 decision_df.set_index(
                     "Decision"
@@ -650,22 +812,71 @@ if dashboard_view == "🏠 Security Overview":
     st.divider()
 
     st.subheader(
-        "Current Research Stack"
+        "AegisGuard Research Stack"
     )
 
     stack = pd.DataFrame(
         [
-            ["Authorization", "Policy enforcement", "Day 1–12"],
-            ["Risk", "Contextual risk scoring", "Day 1–20"],
-            ["Behavior", "Repeated behavioral evidence", "Day 13–20"],
-            ["Scenarios", "Controlled ground-truth cases", "Day 21–22"],
-            ["Dataset", "Reproducible experiments", "Day 23"],
-            ["Evaluation", "Quantitative detection metrics", "Day 24–25"],
-            ["Baseline", "Comparative evaluation", "Day 26"],
-            ["Repeated", "Multi-seed robustness", "Day 27"],
-            ["Statistics", "Statistical evaluation", "Day 28"],
-            ["Multi-resolution", "Hierarchical behavior", "Day 28"],
-            ["Cross-context", "Distributed behavior", "Day 29"],
+            [
+                "Authorization",
+                "Policy enforcement",
+                "Days 1–12",
+            ],
+            [
+                "Risk",
+                "Contextual risk scoring",
+                "Days 1–20",
+            ],
+            [
+                "Behavior",
+                "Repeated behavioral evidence",
+                "Days 13–20",
+            ],
+            [
+                "Scenarios",
+                "Controlled ground-truth cases",
+                "Days 21–22",
+            ],
+            [
+                "Dataset",
+                "Reproducible experiments",
+                "Day 23",
+            ],
+            [
+                "Evaluation",
+                "Quantitative detection metrics",
+                "Days 24–25",
+            ],
+            [
+                "Baseline",
+                "Comparative evaluation",
+                "Day 26",
+            ],
+            [
+                "Repeated",
+                "Multi-seed robustness",
+                "Day 27",
+            ],
+            [
+                "Statistics",
+                "Statistical evaluation",
+                "Day 28",
+            ],
+            [
+                "Multi-resolution",
+                "Hierarchical behavior",
+                "Day 28",
+            ],
+            [
+                "Cross-context",
+                "Distributed behavior",
+                "Day 29",
+            ],
+            [
+                "Adaptive Response",
+                "Graduated runtime response",
+                "Day 30",
+            ],
         ],
         columns=[
             "Layer",
@@ -694,6 +905,7 @@ elif dashboard_view == "📈 Risk Intelligence":
     r1, r2, r3, r4 = st.columns(4)
 
     with r1:
+
         st.metric(
             "Average Risk",
             risk_summary.get(
@@ -703,6 +915,7 @@ elif dashboard_view == "📈 Risk Intelligence":
         )
 
     with r2:
+
         st.metric(
             "Maximum Risk",
             risk_summary.get(
@@ -712,6 +925,7 @@ elif dashboard_view == "📈 Risk Intelligence":
         )
 
     with r3:
+
         st.metric(
             "High Risk",
             risk_summary.get(
@@ -721,6 +935,7 @@ elif dashboard_view == "📈 Risk Intelligence":
         )
 
     with r4:
+
         st.metric(
             "Critical",
             risk_summary.get(
@@ -729,11 +944,11 @@ elif dashboard_view == "📈 Risk Intelligence":
             ),
         )
 
+    st.divider()
+
     high_df = dataframe_or_empty(
         high_risk_events
     )
-
-    st.divider()
 
     if high_df.empty:
 
@@ -752,6 +967,7 @@ elif dashboard_view == "📈 Risk Intelligence":
         download_dataframe(
             high_df,
             "aegisguard_high_risk_events.csv",
+            "download_high_risk",
         )
 
 
@@ -810,6 +1026,7 @@ elif dashboard_view == "🤖 Agent Intelligence":
         download_dataframe(
             agent_df,
             "aegisguard_agent_activity.csv",
+            "download_agent_activity",
         )
 
 
@@ -834,12 +1051,14 @@ elif dashboard_view == "🧠 Behavioral Analytics":
     c1, c2 = st.columns(2)
 
     with c1:
+
         st.metric(
             "Suspicious Agents",
             len(suspicious_df),
         )
 
     with c2:
+
         st.metric(
             "Repeated Denial Patterns",
             len(denial_df),
@@ -868,6 +1087,7 @@ elif dashboard_view == "🧠 Behavioral Analytics":
         download_dataframe(
             suspicious_df,
             "aegisguard_behavior_profiles.csv",
+            "download_behavior_profiles",
         )
 
     st.divider()
@@ -928,9 +1148,11 @@ elif dashboard_view == "🚨 High-Risk Events":
 
         event_index = st.selectbox(
             "Select event",
-            range(len(high_df)),
-            format_func=lambda i:
-                f"Event {i + 1}",
+            range(
+                len(high_df)
+            ),
+            format_func=lambda index:
+                f"Event {index + 1}",
             key="high_risk_event_select",
         )
 
@@ -975,7 +1197,8 @@ elif dashboard_view == "🔎 Security Investigation":
 
     if (
         not agent_df.empty
-        and "agent_id" in agent_df.columns
+        and "agent_id"
+        in agent_df.columns
     ):
 
         agent_names.extend(
@@ -989,7 +1212,8 @@ elif dashboard_view == "🔎 Security Investigation":
 
     if (
         not suspicious_df.empty
-        and "agent_id" in suspicious_df.columns
+        and "agent_id"
+        in suspicious_df.columns
     ):
 
         agent_names.extend(
@@ -1025,14 +1249,17 @@ elif dashboard_view == "🔎 Security Investigation":
 
         if (
             not agent_df.empty
-            and "agent_id" in agent_df.columns
+            and "agent_id"
+            in agent_df.columns
         ):
 
             match_df = agent_df[
                 agent_df[
                     "agent_id"
                 ].astype(str)
-                == str(selected_agent)
+                == str(
+                    selected_agent
+                )
             ]
 
             if not match_df.empty:
@@ -1049,14 +1276,17 @@ elif dashboard_view == "🔎 Security Investigation":
 
         if (
             not suspicious_df.empty
-            and "agent_id" in suspicious_df.columns
+            and "agent_id"
+            in suspicious_df.columns
         ):
 
             behavior_match = suspicious_df[
                 suspicious_df[
                     "agent_id"
                 ].astype(str)
-                == str(selected_agent)
+                == str(
+                    selected_agent
+                )
             ]
 
             if not behavior_match.empty:
@@ -1082,7 +1312,9 @@ elif dashboard_view == "🔎 Security Investigation":
                     "agent_id",
                     "",
                 )
-            ) == str(selected_agent):
+            ) == str(
+                selected_agent
+            ):
 
                 denial_rows.append(
                     item_dict
@@ -1150,6 +1382,7 @@ elif dashboard_view == "🧪 Scenario Laboratory":
         download_dataframe(
             scenario_df,
             "aegisguard_controlled_scenarios.csv",
+            "download_scenarios",
         )
 
         summary_function = (
@@ -1172,11 +1405,16 @@ elif dashboard_view == "🧪 Scenario Laboratory":
             summary_df = pd.DataFrame(
                 [
                     {
-                        "Metric": key,
-                        "Value": value,
+                        "Metric":
+                            key,
+
+                        "Value":
+                            value,
                     }
+
                     for key, value
                     in summary.items()
+
                     if not isinstance(
                         value,
                         (dict, list),
@@ -1204,7 +1442,9 @@ elif dashboard_view == "🧬 Experimental Dataset":
     generate_dataset = (
         MODULES
         .get("dataset", {})
-        .get("generate_experimental_dataset")
+        .get(
+            "generate_experimental_dataset"
+        )
     )
 
     if generate_dataset is None:
@@ -1253,7 +1493,9 @@ elif dashboard_view == "🧬 Experimental Dataset":
                     events_per_scenario=int(
                         events_per_scenario
                     ),
-                    seed=int(seed),
+                    seed=int(
+                        seed
+                    ),
                 )
 
                 st.session_state[
@@ -1270,7 +1512,9 @@ elif dashboard_view == "🧬 Experimental Dataset":
                     "Dataset generation failed."
                 )
 
-                st.exception(exc)
+                st.exception(
+                    exc
+                )
 
         dataset = st.session_state.get(
             "experimental_dataset"
@@ -1291,6 +1535,7 @@ elif dashboard_view == "🧬 Experimental Dataset":
             download_dataframe(
                 dataset_df,
                 "aegisguard_experimental_dataset.csv",
+                "download_dataset",
             )
 
         else:
@@ -1312,8 +1557,6 @@ elif dashboard_view == "📊 Day 24 Evaluation":
 
     st.markdown(
         """
-        Evaluation dimensions:
-
         **Accuracy · Precision · Recall · F1 · Specificity ·
         False Positive Rate · False Negative Rate**
         """
@@ -1358,7 +1601,7 @@ elif dashboard_view == "📊 Day 24 Evaluation":
 
         st.info(
             "Use the evaluation module's implemented metric functions "
-            "for the authoritative quantitative results."
+            "for authoritative quantitative results."
         )
 
 
@@ -1384,7 +1627,9 @@ elif dashboard_view == "⚖️ Day 26 Baseline Comparison":
     generate_dataset = (
         MODULES
         .get("dataset", {})
-        .get("generate_experimental_dataset")
+        .get(
+            "generate_experimental_dataset"
+        )
     )
 
     if (
@@ -1435,8 +1680,12 @@ elif dashboard_view == "⚖️ Day 26 Baseline Comparison":
                     scenarios=list(
                         scenario_catalogue
                     ),
-                    events_per_scenario=int(events),
-                    seed=int(seed),
+                    events_per_scenario=int(
+                        events
+                    ),
+                    seed=int(
+                        seed
+                    ),
                 )
 
                 result = compare_detectors(
@@ -1464,7 +1713,9 @@ elif dashboard_view == "⚖️ Day 26 Baseline Comparison":
                     "Day 26 comparison failed."
                 )
 
-                st.exception(exc)
+                st.exception(
+                    exc
+                )
 
         result = st.session_state.get(
             "day26_results"
@@ -1484,7 +1735,7 @@ elif dashboard_view == "⚖️ Day 26 Baseline Comparison":
 
             rows = []
 
-            metrics = [
+            for metric in [
                 "accuracy",
                 "precision",
                 "recall",
@@ -1492,9 +1743,7 @@ elif dashboard_view == "⚖️ Day 26 Baseline Comparison":
                 "specificity",
                 "false_positive_rate",
                 "false_negative_rate",
-            ]
-
-            for metric in metrics:
+            ]:
 
                 baseline_value = safe_number(
                     baseline.get(
@@ -1549,37 +1798,30 @@ elif dashboard_view == "⚖️ Day 26 Baseline Comparison":
                 hide_index=True,
             )
 
-            if {
-                "accuracy",
-                "precision",
-                "recall",
-                "f1_score",
-            }.intersection(
-                comparison_df["Metric"]
-            ):
-
-                chart_df = (
+            chart_df = (
+                comparison_df[
                     comparison_df[
-                        comparison_df[
-                            "Metric"
-                        ].isin(
-                            [
-                                "accuracy",
-                                "precision",
-                                "recall",
-                                "f1_score",
-                            ]
-                        )
-                    ]
-                    .set_index(
                         "Metric"
-                    )[
+                    ].isin(
                         [
-                            "Baseline",
-                            "AegisGuard",
+                            "accuracy",
+                            "precision",
+                            "recall",
+                            "f1_score",
                         ]
+                    )
+                ]
+                .set_index(
+                    "Metric"
+                )[
+                    [
+                        "Baseline",
+                        "AegisGuard",
                     ]
-                )
+                ]
+            )
+
+            if not chart_df.empty:
 
                 st.bar_chart(
                     chart_df,
@@ -1728,8 +1970,10 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
                 ] = {
                     "threshold":
                         threshold,
+
                     "events_per_scenario":
                         events,
+
                     "seeds":
                         seeds,
                 }
@@ -1744,7 +1988,9 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
                     "Day 27 experiment failed."
                 )
 
-                st.exception(exc)
+                st.exception(
+                    exc
+                )
 
         results = st.session_state.get(
             "day27_results"
@@ -1760,6 +2006,7 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
             c1, c2, c3, c4 = st.columns(4)
 
             with c1:
+
                 st.metric(
                     "Experiments",
                     consistency.get(
@@ -1769,6 +2016,7 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
                 )
 
             with c2:
+
                 st.metric(
                     "AegisGuard Wins",
                     consistency.get(
@@ -1778,6 +2026,7 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
                 )
 
             with c3:
+
                 st.metric(
                     "Win Rate",
                     format_percent(
@@ -1789,13 +2038,16 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
                 )
 
             with c4:
+
                 st.metric(
                     "Mean F1 Difference",
                     f"{safe_number(consistency.get('mean_difference', 0)) * 100:+.2f}%",
                 )
 
             seed_df = dataframe_or_empty(
-                build_seed_summary(results)
+                build_seed_summary(
+                    results
+                )
             )
 
             if not seed_df.empty:
@@ -1835,6 +2087,7 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
                 download_dataframe(
                     display_df,
                     "aegisguard_day27_results.csv",
+                    "download_day27",
                 )
 
                 if {
@@ -1854,7 +2107,9 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
                             ]
                         ]
                         .copy()
-                        .set_index("seed")
+                        .set_index(
+                            "seed"
+                        )
                     )
 
                     chart_df.columns = [
@@ -1868,7 +2123,9 @@ elif dashboard_view == "🔬 Day 27 Repeated Evaluation":
                     )
 
             summary_df = dataframe_or_empty(
-                build_summary_table(results)
+                build_summary_table(
+                    results
+                )
             )
 
             if not summary_df.empty:
@@ -1935,7 +2192,7 @@ elif dashboard_view == "📐 Day 28 Statistical Evaluation":
     else:
 
         st.success(
-            "Repeated experimental results are available for statistical analysis."
+            "Repeated experimental results are available."
         )
 
         result_df = dataframe_or_empty(
@@ -1962,7 +2219,9 @@ elif dashboard_view == "📐 Day 28 Statistical Evaluation":
 
         functions = [
             name
-            for name in dir(statistical)
+            for name in dir(
+                statistical
+            )
             if not name.startswith("_")
             and callable(
                 getattr(
@@ -1983,15 +2242,6 @@ elif dashboard_view == "📐 Day 28 Statistical Evaluation":
             hide_index=True,
         )
 
-        st.info(
-            """
-            The statistical module is treated as the authoritative
-            implementation for statistical calculations. The dashboard
-            deliberately does not invent p-values, confidence intervals,
-            effect sizes or significance conclusions.
-            """
-        )
-
         paired_function = getattr(
             statistical,
             "calculate_paired_differences",
@@ -2002,8 +2252,10 @@ elif dashboard_view == "📐 Day 28 Statistical Evaluation":
 
             try:
 
-                differences = paired_function(
-                    results
+                differences = (
+                    paired_function(
+                        results
+                    )
                 )
 
                 if differences:
@@ -2017,7 +2269,9 @@ elif dashboard_view == "📐 Day 28 Statistical Evaluation":
                             "Experiment":
                                 range(
                                     1,
-                                    len(differences) + 1,
+                                    len(
+                                        differences
+                                    ) + 1,
                                 ),
 
                             "Difference":
@@ -2034,12 +2288,21 @@ elif dashboard_view == "📐 Day 28 Statistical Evaluation":
             except Exception as exc:
 
                 st.warning(
-                    f"Paired-difference calculation unavailable for this result structure: {exc}"
+                    "Paired-difference calculation "
+                    f"unavailable: {exc}"
                 )
+
+        st.info(
+            """
+            Statistical outputs should be interpreted using the
+            implemented statistical evaluation functions. The dashboard
+            does not manufacture significance claims.
+            """
+        )
 
 
 # ============================================================
-# DAY 28 — MULTI-RESOLUTION
+# DAY 28 — MULTI-RESOLUTION BEHAVIOR
 # ============================================================
 
 elif dashboard_view == "🧬 Day 28 Multi-Resolution Behavior":
@@ -2092,21 +2355,21 @@ elif dashboard_view == "🧬 Day 28 Multi-Resolution Behavior":
             """
             **Action → Capability → Resource → Context**
 
-            Day 28 evaluates behavior at multiple resolutions instead
-            of relying exclusively on isolated authorization decisions.
+            Day 28 evaluates behavior at multiple resolutions rather
+            than relying exclusively on isolated authorization decisions.
             """
         )
 
         if not events:
 
             st.info(
-                "Generate an experimental dataset or provide events first."
+                "Generate an experimental dataset first."
             )
 
         else:
 
             if st.button(
-                "Analyze Multi-Resolution Behavior",
+                "▶️ Analyze Multi-Resolution Behavior",
                 type="primary",
                 key="day28_analyze",
             ):
@@ -2145,7 +2408,8 @@ elif dashboard_view == "🧬 Day 28 Multi-Resolution Behavior":
                 if profile is None:
 
                     st.error(
-                        "No compatible multi-resolution analysis function was found."
+                        "No compatible multi-resolution "
+                        "analysis function was found."
                     )
 
                 else:
@@ -2165,24 +2429,11 @@ elif dashboard_view == "🧬 Day 28 Multi-Resolution Behavior":
                     dict,
                 ):
 
-                    scalar_rows = []
-
-                    for key, value in profile.items():
-
-                        if isinstance(
-                            value,
-                            (str, int, float, bool),
-                        ):
-
-                            scalar_rows.append(
-                                {
-                                    "Metric":
-                                        key,
-
-                                    "Value":
-                                        value,
-                                }
-                            )
+                    scalar_rows = (
+                        extract_scalar_rows(
+                            profile
+                        )
+                    )
 
                     if scalar_rows:
 
@@ -2199,14 +2450,12 @@ elif dashboard_view == "🧬 Day 28 Multi-Resolution Behavior":
                         )
 
                     with st.expander(
-                        "View complete multi-resolution profile"
+                        "Complete Multi-Resolution Profile"
                     ):
 
-                        st.json(profile)
-
-                else:
-
-                    st.write(profile)
+                        st.json(
+                            profile
+                        )
 
 
 # ============================================================
@@ -2220,8 +2469,8 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
     )
 
     st.caption(
-        "Identify distributed behavioral relationships across contexts, "
-        "capabilities and resources."
+        "Identify distributed behavioral relationships across "
+        "contexts, capabilities and resources."
     )
 
     cross_context = MODULES.get(
@@ -2263,12 +2512,8 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
             for event in events
         ]
 
-        st.subheader(
-            "Input Events"
-        )
-
         input_mode = st.radio(
-            "Source",
+            "Input Source",
             [
                 "Current Session Events",
                 "Manual JSON",
@@ -2297,7 +2542,6 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                         "context":
                             "context-A",
                     },
-
                     {
                         "agent_id":
                             "agent-demo",
@@ -2314,7 +2558,6 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                         "context":
                             "context-B",
                     },
-
                     {
                         "agent_id":
                             "agent-demo",
@@ -2413,25 +2656,31 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                         None,
                     )
 
-                    summary_function = getattr(
-                        cross_context,
-                        "build_research_summary",
-                        None,
-                    )
-
                     if profile_function is None:
 
                         raise RuntimeError(
                             "build_cross_context_profile is missing."
                         )
 
-                    profile = profile_function(
-                        events
+                    profile = (
+                        profile_function(
+                            events
+                        )
+                    )
+
+                    summary_function = getattr(
+                        cross_context,
+                        "build_research_summary",
+                        None,
                     )
 
                     summary = (
-                        summary_function(events)
-                        if summary_function
+                        summary_function(
+                            events
+                        )
+                        if callable(
+                            summary_function
+                        )
                         else {}
                     )
 
@@ -2457,7 +2706,9 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                         "Day 29 analysis failed."
                     )
 
-                    st.exception(exc)
+                    st.exception(
+                        exc
+                    )
 
             profile = st.session_state.get(
                 "day29_profile"
@@ -2477,21 +2728,9 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                         None,
                     )
 
-                    correlations_function = getattr(
-                        cross_context,
-                        "calculate_context_correlations",
-                        None,
-                    )
-
                     score = safe_call(
                         risk_function,
                         0.0,
-                        events,
-                    )
-
-                    correlations = safe_call(
-                        correlations_function,
-                        {},
                         events,
                     )
 
@@ -2499,35 +2738,11 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                         "event_count":
                             len(events),
 
-                        "context_count":
-                            correlations.get(
-                                "context_count",
-                                0,
-                            )
-                            if isinstance(
-                                correlations,
-                                dict,
-                            )
-                            else 0,
-
-                        "correlated_pairs":
-                            correlations.get(
-                                "correlated_pairs",
-                                0,
-                            )
-                            if isinstance(
-                                correlations,
-                                dict,
-                            )
-                            else 0,
-
                         "cross_context_risk":
                             score,
                     }
 
-                st.divider()
-
-                c1, c2, c3, c4 = st.columns(4)
+                c1, c2, c3 = st.columns(3)
 
                 with c1:
 
@@ -2542,35 +2757,31 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                 with c2:
 
                     st.metric(
-                        "Contexts",
-                        summary.get(
-                            "context_count",
-                            0,
-                        ),
+                        "Cross-Context Risk",
+                        f"{safe_number(summary.get('cross_context_risk', 0)):.2f}",
                     )
 
                 with c3:
 
                     st.metric(
-                        "Correlated Pairs",
-                        summary.get(
-                            "correlated_pairs",
-                            0,
+                        "Contexts",
+                        len(
+                            {
+                                str(
+                                    event.get(
+                                        "context",
+                                        "",
+                                    )
+                                )
+                                for event in events
+                                if event.get(
+                                    "context"
+                                )
+                            }
                         ),
                     )
 
-                with c4:
-
-                    st.metric(
-                        "Cross-Context Risk",
-                        f"{safe_number(summary.get('cross_context_risk', 0)):.2f}",
-                    )
-
                 st.divider()
-
-                # ------------------------------------------------
-                # Distributions
-                # ------------------------------------------------
 
                 distribution_functions = {
                     "Context":
@@ -2620,6 +2831,7 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                                     "Count":
                                         value,
                                 }
+
                                 for key, value
                                 in distribution.items()
                             ]
@@ -2630,10 +2842,6 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                             width="stretch",
                             hide_index=True,
                         )
-
-                # ------------------------------------------------
-                # Diversity
-                # ------------------------------------------------
 
                 diversity_function = getattr(
                     cross_context,
@@ -2662,6 +2870,7 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                                 "Value":
                                     value,
                             }
+
                             for key, value
                             in diversity.items()
                         ]
@@ -2672,59 +2881,6 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                         width="stretch",
                         hide_index=True,
                     )
-
-                    st.bar_chart(
-                        diversity_df.set_index(
-                            "Dimension"
-                        ),
-                        width="stretch",
-                    )
-
-                # ------------------------------------------------
-                # Entropy
-                # ------------------------------------------------
-
-                entropy_function = getattr(
-                    cross_context,
-                    "calculate_cross_context_entropy",
-                    None,
-                )
-
-                entropy = safe_call(
-                    entropy_function,
-                    {},
-                    events,
-                )
-
-                if entropy:
-
-                    st.subheader(
-                        "Cross-Context Entropy"
-                    )
-
-                    entropy_df = pd.DataFrame(
-                        [
-                            {
-                                "Dimension":
-                                    key,
-
-                                "Entropy":
-                                    value,
-                            }
-                            for key, value
-                            in entropy.items()
-                        ]
-                    )
-
-                    st.dataframe(
-                        entropy_df,
-                        width="stretch",
-                        hide_index=True,
-                    )
-
-                # ------------------------------------------------
-                # Correlations
-                # ------------------------------------------------
 
                 correlation_function = getattr(
                     cross_context,
@@ -2774,154 +2930,661 @@ elif dashboard_view == "🔗 Day 29 Cross-Context Intelligence":
                             hide_index=True,
                         )
 
-                        if (
-                            "correlation_score"
-                            in correlation_df.columns
-                        ):
-
-                            chart_df = (
-                                correlation_df[
-                                    [
-                                        "context_a",
-                                        "context_b",
-                                        "correlation_score",
-                                    ]
-                                ]
-                                .copy()
-                            )
-
-                            chart_df["pair"] = (
-                                chart_df[
-                                    "context_a"
-                                ].astype(str)
-                                + " ↔ "
-                                + chart_df[
-                                    "context_b"
-                                ].astype(str)
-                            )
-
-                            st.bar_chart(
-                                chart_df[
-                                    [
-                                        "pair",
-                                        "correlation_score",
-                                    ]
-                                ].set_index(
-                                    "pair"
-                                ),
-                                width="stretch",
-                            )
-
-                # ------------------------------------------------
-                # Agent profiles
-                # ------------------------------------------------
-
-                agent_function = getattr(
-                    cross_context,
-                    "build_agent_profiles",
-                    None,
-                )
-
-                agent_profiles = safe_call(
-                    agent_function,
-                    {},
-                    events,
-                )
-
-                if agent_profiles:
-
-                    st.subheader(
-                        "Agent-Level Profiles"
-                    )
-
-                    rows = []
-
-                    for agent_id, agent_profile in (
-                        agent_profiles.items()
-                    ):
-
-                        agent_profile = (
-                            agent_profile
-                            if isinstance(
-                                agent_profile,
-                                dict,
-                            )
-                            else {}
-                        )
-
-                        correlations = (
-                            agent_profile.get(
-                                "correlations",
-                                {},
-                            )
-                        )
-
-                        rows.append(
-                            {
-                                "Agent":
-                                    agent_id,
-
-                                "Events":
-                                    agent_profile.get(
-                                        "event_count",
-                                        0,
-                                    ),
-
-                                "Contexts":
-                                    correlations.get(
-                                        "context_count",
-                                        0,
-                                    ),
-
-                                "Correlated Pairs":
-                                    correlations.get(
-                                        "correlated_pairs",
-                                        0,
-                                    ),
-
-                                "Risk":
-                                    agent_profile.get(
-                                        "cross_context_risk",
-                                        0,
-                                    ),
-                            }
-                        )
-
-                    if rows:
-
-                        st.dataframe(
-                            pd.DataFrame(rows),
-                            width="stretch",
-                            hide_index=True,
-                        )
-
-                st.divider()
-
-                st.info(
-                    """
-                    Day 29 is a behavioral correlation signal.
-                    Correlation does not prove malicious behavior.
-                    A high score should support investigation or
-                    reassessment rather than automatic attribution.
-                    """
-                )
-
                 with st.expander(
                     "Complete Day 29 Profile"
                 ):
 
-                    st.json(profile)
+                    st.json(
+                        profile
+
+                    )
+
+
+# ============================================================
+# DAY 30 — ADAPTIVE RUNTIME RESPONSE
+# ============================================================
+
+elif dashboard_view == "🛡️ Day 30 Adaptive Runtime Response":
+
+    st.header(
+        "🛡️ Day 30 — Adaptive Runtime Response"
+    )
+
+    st.caption(
+        "Convert accumulated security evidence into a graduated "
+        "runtime response instead of relying exclusively on binary "
+        "allow/deny enforcement."
+    )
+
+    adaptive = MODULES.get(
+        "adaptive_response"
+    )
+
+    if adaptive is None:
+
+        st.error(
+            "Day 30 adaptive response module is unavailable."
+        )
+
+        error = MODULES.get(
+            "adaptive_response_error"
+        )
+
+        if error:
+            st.code(
+                error
+            )
+
+        st.markdown(
+            """
+            Expected module:
+
+            ```text
+            app/adaptive_response.py
+            ```
+            """
+
+        )
+
+    else:
+
+        st.markdown(
+            """
+            ### Adaptive security model
+
+            Day 30 introduces a graduated response layer:
+
+            **ALLOW → ALLOW WITH MONITORING → STEP-UP VERIFICATION
+            → REDUCE SCOPE → DENY / ESCALATE**
+
+            The purpose is to avoid treating every suspicious signal
+            as an immediate binary denial.
+
+            The response should depend on accumulated evidence such as:
+
+            - risk score
+            - behavioral anomaly score
+            - repeated denials
+            - cross-context evidence
+            - contextual security signals
+
+            This is an experimental runtime-response mechanism and
+            requires controlled evaluation before production use.
+            """
+        )
+
+        st.divider()
+
+        st.subheader(
+            "Security Evidence"
+        )
+
+        evidence_source = st.radio(
+            "Evidence Source",
+            [
+                "Manual Evidence",
+                "Selected High-Risk Event",
+                "Current Risk Summary",
+                "Day 29 Cross-Context Result",
+            ],
+            horizontal=True,
+            key="day30_evidence_source",
+        )
+
+        evidence: dict[str, Any] = {}
+
+        if evidence_source == "Manual Evidence":
+
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+
+                risk_score = st.slider(
+                    "Risk Score",
+                    min_value=0,
+                    max_value=100,
+                    value=45,
+                    step=1,
+                    key="day30_risk_score",
+                )
+
+            with c2:
+
+                anomaly_score = st.slider(
+                    "Anomaly Score",
+                    min_value=0,
+                    max_value=100,
+                    value=20,
+                    step=1,
+                    key="day30_anomaly_score",
+                )
+
+            with c3:
+
+                denial_count = st.number_input(
+                    "Repeated Denials",
+                    min_value=0,
+                    max_value=1000,
+                    value=0,
+                    step=1,
+                    key="day30_denial_count",
+                )
+
+            evidence = {
+                "risk_score":
+                    risk_score,
+
+                "anomaly_score":
+                    anomaly_score,
+
+                "repeated_denials":
+                    denial_count,
+            }
+
+        elif evidence_source == "Selected High-Risk Event":
+
+            selected_event = st.session_state.get(
+                "selected_event"
+            )
+
+            if not selected_event:
+
+                high_df = dataframe_or_empty(
+                    high_risk_events
+                )
+
+                if high_df.empty:
+
+                    st.info(
+                        "No high-risk event is available."
+                    )
+
+                else:
+
+                    event_index = st.selectbox(
+                        "Select High-Risk Event",
+                        range(
+                            len(high_df)
+                        ),
+                        format_func=lambda index:
+                            f"Event {index + 1}",
+                        key="day30_high_risk_event",
+                    )
+
+                    selected_event = (
+                        high_df.iloc[
+                            event_index
+                        ].to_dict()
+                    )
+
+            if selected_event:
+
+                evidence = as_dict(
+                    selected_event
+                )
+
+                st.json(
+                    evidence
+                )
+
+        elif evidence_source == "Current Risk Summary":
+
+            evidence = {
+                "risk_score":
+                    risk_summary.get(
+                        "average_risk",
+                        0,
+                    ),
+
+                "anomaly_score":
+                    0,
+
+                "repeated_denials":
+                    len(
+                        repeated_denials
+                    ),
+
+                "high_risk_events":
+                    risk_summary.get(
+                        "high_risk_events",
+                        0,
+                    ),
+
+                "critical_events":
+                    risk_summary.get(
+                        "critical_events",
+                        0,
+                    ),
+            }
+
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Evidence":
+                                key,
+
+                            "Value":
+                                value,
+                        }
+
+                        for key, value
+                        in evidence.items()
+                    ]
+                ),
+                width="stretch",
+                hide_index=True,
+            )
+
+        else:
+
+            day29_summary = (
+                st.session_state.get(
+                    "day29_summary"
+                )
+                or {}
+            )
+
+            day29_profile = (
+                st.session_state.get(
+                    "day29_profile"
+                )
+                or {}
+            )
+
+            cross_context_risk = safe_number(
+                day29_summary.get(
+                    "cross_context_risk",
+                    day29_profile.get(
+                        "cross_context_risk",
+                        0,
+                    )
+                    if isinstance(
+                        day29_profile,
+                        dict,
+                    )
+                    else 0,
+                )
+            )
+
+            evidence = {
+                "risk_score":
+                    risk_summary.get(
+                        "average_risk",
+                        0,
+                    ),
+
+                "anomaly_score":
+                    cross_context_risk,
+
+                "repeated_denials":
+                    len(
+                        repeated_denials
+                    ),
+
+                "cross_context_risk":
+                    cross_context_risk,
+            }
+
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Evidence":
+                                key,
+
+                            "Value":
+                                value,
+                        }
+
+                        for key, value
+                        in evidence.items()
+                    ]
+                ),
+                width="stretch",
+                hide_index=True,
+            )
+
+        st.divider()
+
+        if evidence:
+
+            st.session_state[
+                "day30_evidence"
+            ] = evidence
+
+            st.subheader(
+                "Adaptive Response Engine"
+            )
+
+            response_function = getattr(
+                adaptive,
+                "calculate_adaptive_response",
+                None,
+            )
+
+            if not callable(
+                response_function
+            ):
+
+                st.error(
+                    "calculate_adaptive_response() "
+                    "was not found in app.adaptive_response."
+                )
+
+                available_functions = [
+                    name
+                    for name in dir(
+                        adaptive
+                    )
+                    if not name.startswith("_")
+                    and callable(
+                        getattr(
+                            adaptive,
+                            name,
+                        )
+                    )
+                ]
+
+                if available_functions:
+
+                    st.subheader(
+                        "Available Functions"
+                    )
+
+                    st.dataframe(
+                        pd.DataFrame(
+                            {
+                                "Function":
+                                    available_functions
+                            }
+                        ),
+                        width="stretch",
+                        hide_index=True,
+                    )
 
             else:
 
-                st.info(
-                    "Run the Day 29 analysis to generate the profile."
+                if st.button(
+                    "▶️ Calculate Adaptive Response",
+                    type="primary",
+                    key="day30_calculate",
+                ):
+
+                    try:
+
+                        result = (
+                            response_function(
+                                evidence
+                            )
+                        )
+
+                        if not isinstance(
+                            result,
+                            dict,
+                        ):
+
+                            result = {
+                                "action":
+                                    str(
+                                        result
+                                    )
+                            }
+
+                        st.session_state[
+                            "day30_result"
+                        ] = result
+
+                        st.success(
+                            "Adaptive response calculated."
+                        )
+
+                    except Exception as exc:
+
+                        st.session_state[
+                            "day30_result"
+                        ] = None
+
+                        st.error(
+                            "Adaptive response calculation failed."
+                        )
+
+                        st.exception(
+                            exc
+                        )
+
+                result = st.session_state.get(
+                    "day30_result"
                 )
+
+                if result:
+
+                    st.divider()
+
+                    action = str(
+                        result.get(
+                            "action",
+                            "UNKNOWN",
+                        )
+                    )
+
+                    reason = result.get(
+                        "reason",
+                        result.get(
+                            "rationale",
+                            "",
+                        ),
+                    )
+
+                    response_score = result.get(
+                        "score",
+                        result.get(
+                            "risk_score",
+                            result.get(
+                                "adaptive_score",
+                                None,
+                            ),
+                        ),
+                    )
+
+                    st.subheader(
+                        "Runtime Decision"
+                    )
+
+                    c1, c2, c3 = st.columns(3)
+
+                    with c1:
+
+                        st.metric(
+                            "Response",
+                            action,
+                        )
+
+                    with c2:
+
+                        if response_score is None:
+
+                            st.metric(
+                                "Adaptive Score",
+                                "N/A",
+                            )
+
+                        else:
+
+                            st.metric(
+                                "Adaptive Score",
+                                f"{safe_number(response_score):.2f}",
+                            )
+
+                    with c3:
+
+                        st.metric(
+                            "Evidence Fields",
+                            len(
+                                evidence
+                            ),
+                        )
+
+                    if action in {
+                        "ALLOW",
+                        "ALLOW_WITH_MONITORING",
+                    }:
+
+                        st.success(
+                            f"Recommended response: {action}"
+                        )
+
+                    elif action in {
+                        "STEP_UP_VERIFICATION",
+                        "REDUCE_SCOPE",
+                    }:
+
+                        st.warning(
+                            f"Recommended response: {action}"
+                        )
+
+                    elif action in {
+                        "DENY",
+                        "ESCALATE",
+                    }:
+
+                        st.error(
+                            f"Recommended response: {action}"
+                        )
+
+                    else:
+
+                        st.info(
+                            f"Response: {action}"
+                        )
+
+                    if reason:
+
+                        st.subheader(
+                            "Decision Rationale"
+                        )
+
+                        st.write(
+                            reason
+                        )
+
+                    st.divider()
+
+                    st.subheader(
+                        "Evidence Used"
+                    )
+
+                    evidence_df = pd.DataFrame(
+                        [
+                            {
+                                "Evidence":
+                                    key,
+
+                                "Value":
+                                    value,
+                            }
+
+                            for key, value
+                            in evidence.items()
+                        ]
+                    )
+
+                    st.dataframe(
+                        evidence_df,
+                        width="stretch",
+                        hide_index=True,
+                    )
+
+                    st.divider()
+
+                    st.subheader(
+                        "Adaptive Response Lifecycle"
+                    )
+
+                    lifecycle_df = pd.DataFrame(
+                        [
+                            {
+                                "Stage":
+                                    1,
+
+                                "Security Evidence":
+                                    "Risk + behavior + context",
+
+                                "Purpose":
+                                    "Collect runtime evidence",
+                            },
+                            {
+                                "Stage":
+                                    2,
+
+                                "Security Evidence":
+                                    "Evidence aggregation",
+
+                                "Purpose":
+                                    "Assess current behavioral state",
+                            },
+                            {
+                                "Stage":
+                                    3,
+
+                                "Security Evidence":
+                                    "Adaptive response",
+
+                                "Purpose":
+                                    "Select graduated response",
+                            },
+                            {
+                                "Stage":
+                                    4,
+
+                                "Security Evidence":
+                                    "Runtime enforcement",
+
+                                "Purpose":
+                                    "Apply the selected action",
+                            },
+                            {
+                                "Stage":
+                                    5,
+
+                                "Security Evidence":
+                                    "Reassessment",
+
+                                "Purpose":
+                                    "Continue monitoring after intervention",
+                            },
+                        ]
+                    )
+
+                    st.dataframe(
+                        lifecycle_df,
+                        width="stretch",
+                        hide_index=True,
+                    )
+
+                    with st.expander(
+                        "Complete Adaptive Response Object"
+                    ):
+
+                        st.json(
+                            result
+                        )
+
+                    st.warning(
+                        """
+                        Day 30 is intentionally designed as an adaptive
+                        decision layer, not as proof that any particular
+                        response threshold is optimal. Thresholds and
+                        response policies must be validated through
+                        controlled experiments, false-positive analysis,
+                        false-negative analysis and deployment testing.
+                        """
+                    )
 
         else:
 
             st.info(
-                "No behavioral events are available."
+                "Provide security evidence to calculate a runtime response."
             )
 
 
@@ -2942,8 +3605,8 @@ elif dashboard_view == "📚 Research Interpretation":
     st.markdown(
         """
         **Can behavior-aware security intelligence provide measurable
-        detection benefit beyond a simpler risk-only authorization
-        baseline for autonomous AI agents?**
+        detection and response benefits beyond a simpler risk-only
+        authorization baseline for autonomous AI agents?**
         """
     )
 
@@ -2953,7 +3616,7 @@ elif dashboard_view == "📚 Research Interpretation":
         [
             [
                 "Authorization",
-                "Allow / Deny decisions",
+                "Allow / Deny",
                 "Security enforcement",
             ],
             [
@@ -2968,7 +3631,7 @@ elif dashboard_view == "📚 Research Interpretation":
             ],
             [
                 "Controlled Scenarios",
-                "Ground-truth attack/benign cases",
+                "Ground-truth cases",
                 "Reproducibility",
             ],
             [
@@ -2983,23 +3646,28 @@ elif dashboard_view == "📚 Research Interpretation":
             ],
             [
                 "Repeated Evaluation",
-                "Multiple random seeds",
+                "Multiple seeds",
                 "Robustness",
             ],
             [
                 "Statistical Evaluation",
-                "Paired differences/statistics",
+                "Paired differences",
                 "Research validation",
             ],
             [
                 "Multi-Resolution",
-                "Action/capability/resource/context",
+                "Action / capability / resource / context",
                 "Hierarchical behavior",
             ],
             [
                 "Cross-Context",
                 "Context relationships",
                 "Distributed behavior",
+            ],
+            [
+                "Adaptive Response",
+                "Graduated runtime action",
+                "Runtime mitigation",
             ],
         ],
         columns=[
@@ -3021,37 +3689,44 @@ elif dashboard_view == "📚 Research Interpretation":
         "Claims We Can Make Carefully"
     )
 
-    for statement in [
-        "The project contains controlled security scenarios.",
+    claims = [
+        "Controlled security scenarios exist.",
         "The experiments are designed to be reproducible.",
         "A baseline comparison framework exists.",
         "Repeated evaluation is implemented.",
-        "Statistical evaluation is being added to the research workflow.",
-        "Cross-context behavioral correlation is implemented as an experimental mechanism.",
-    ]:
+        "Statistical evaluation is implemented.",
+        "Multi-resolution behavioral analysis is implemented.",
+        "Cross-context behavioral correlation is implemented.",
+        "An adaptive runtime response layer is implemented.",
+    ]
+
+    for claim in claims:
 
         st.markdown(
-            f"✓ {statement}"
+            f"✓ {claim}"
         )
 
     st.divider()
 
     st.subheader(
-        "Claims We Should Not Make Without Evidence"
+        "Claims Requiring Further Evidence"
     )
 
-    for statement in [
-        "Universal superiority over existing systems.",
+    limitations = [
+        "Universal superiority over existing agent-security systems.",
         "Complete protection against prompt injection.",
         "Zero false positives or false negatives.",
-        "Production readiness based only on the dashboard.",
+        "Optimal adaptive-response thresholds.",
+        "Production readiness.",
         "Patentability or guaranteed novelty.",
         "Real-world generalization from synthetic experiments alone.",
-        "Statistical significance without running the statistical tests.",
-    ]:
+        "Statistical significance without executing the statistical tests.",
+    ]
+
+    for limitation in limitations:
 
         st.markdown(
-            f"⚠ {statement}"
+            f"⚠ {limitation}"
         )
 
 
@@ -3062,32 +3737,70 @@ elif dashboard_view == "📚 Research Interpretation":
 elif dashboard_view == "📅 Project Construction":
 
     st.header(
-        "📅 AegisGuard Day 1–29 Construction"
+        "📅 AegisGuard Day 1–30 Construction"
     )
 
     milestones = [
-        ("Days 1–12", "Security Foundation",
-         "Identity, policy, authorization, risk, database and security controls."),
-        ("Days 13–16", "Security Analytics",
-         "Behavioral monitoring, security analytics and SOC dashboard."),
-        ("Days 17–20", "Investigation + Intelligence",
-         "Investigation, behavioral anomalies and integrated security intelligence."),
-        ("Days 21–22", "Controlled Scenarios",
-         "Controlled security scenarios and attack scenario framework."),
-        ("Day 23", "Experimental Dataset",
-         "Reproducible synthetic security dataset generation."),
-        ("Days 24–25", "Detection Evaluation",
-         "Quantitative detection and research evaluation."),
-        ("Day 26", "Baseline Comparison",
-         "AegisGuard compared against a simpler baseline."),
-        ("Day 27", "Repeated Evaluation",
-         "Multiple random seeds for robustness assessment."),
-        ("Day 28", "Statistical Evaluation",
-         "Statistical analysis of repeated experimental differences."),
-        ("Day 28", "Multi-Resolution Behavior",
-         "Behavior evaluated across multiple resolutions."),
-        ("Day 29", "Cross-Context Correlation",
-         "Relationships across execution contexts, capabilities and resources."),
+        (
+            "Days 1–12",
+            "Security Foundation",
+            "Identity, policy, authorization, risk and core security controls.",
+        ),
+        (
+            "Days 13–16",
+            "Security Analytics",
+            "Behavioral monitoring, security analytics and SOC dashboard.",
+        ),
+        (
+            "Days 17–20",
+            "Investigation + Intelligence",
+            "Investigation, anomaly monitoring and integrated intelligence.",
+        ),
+        (
+            "Days 21–22",
+            "Controlled Scenarios",
+            "Controlled attack and benign security scenarios.",
+        ),
+        (
+            "Day 23",
+            "Experimental Dataset",
+            "Reproducible experimental dataset generation.",
+        ),
+        (
+            "Days 24–25",
+            "Detection Evaluation",
+            "Quantitative detection and research evaluation.",
+        ),
+        (
+            "Day 26",
+            "Baseline Comparison",
+            "AegisGuard compared with a simpler baseline.",
+        ),
+        (
+            "Day 27",
+            "Repeated Evaluation",
+            "Multi-seed robustness evaluation.",
+        ),
+        (
+            "Day 28",
+            "Statistical Evaluation",
+            "Statistical analysis of repeated experimental differences.",
+        ),
+        (
+            "Day 28",
+            "Multi-Resolution Behavior",
+            "Hierarchical behavioral analysis.",
+        ),
+        (
+            "Day 29",
+            "Cross-Context Correlation",
+            "Distributed behavioral relationship analysis.",
+        ),
+        (
+            "Day 30",
+            "Adaptive Runtime Response",
+            "Graduated runtime response based on accumulated evidence.",
+        ),
     ]
 
     construction_df = pd.DataFrame(
@@ -3113,22 +3826,22 @@ elif dashboard_view == "📅 Project Construction":
 
     st.markdown(
         """
-        Every milestone should follow:
+        Every milestone follows:
 
-        **Design → Implement → Test → Integrate → Experiment →
-        Compare → Validate → Document**
+        **Design → Implement → Unit Test → Integrate →
+        Experiment → Compare → Validate → Document**
 
-        A feature is not considered research evidence merely because
-        the Streamlit dashboard displays it.
+        A dashboard feature is not research evidence merely because
+        it is displayed successfully.
         """
     )
 
     st.progress(
-        29 / 70
+        30 / 70
     )
 
     st.caption(
-        "Current roadmap position: Day 29 / 70"
+        "Current roadmap position: Day 30 / 70"
     )
 
 
@@ -3143,7 +3856,8 @@ elif dashboard_view == "🚀 Deployment & Validation":
     )
 
     st.caption(
-        "Verify the actual environment, modules, files and automated tests."
+        "Verify environment, dependencies, modules, required files "
+        "and the complete automated test suite."
     )
 
     st.divider()
@@ -3162,7 +3876,8 @@ elif dashboard_view == "🚀 Deployment & Validation":
 
     environment_ok = (
         EXPECTED_ENV in executable.parents
-        or executable.parent.parent == EXPECTED_ENV
+        or executable.parent.parent
+        == EXPECTED_ENV
     )
 
     environment_df = pd.DataFrame(
@@ -3172,7 +3887,9 @@ elif dashboard_view == "🚀 Deployment & Validation":
                     "Python executable",
 
                 "Value":
-                    str(executable),
+                    str(
+                        executable
+                    ),
 
                 "Status":
                     "READY"
@@ -3184,7 +3901,9 @@ elif dashboard_view == "🚀 Deployment & Validation":
                     "Project directory",
 
                 "Value":
-                    str(PROJECT_ROOT),
+                    str(
+                        PROJECT_ROOT
+                    ),
 
                 "Status":
                     "READY"
@@ -3196,7 +3915,9 @@ elif dashboard_view == "🚀 Deployment & Validation":
                     "App directory",
 
                 "Value":
-                    str(APP_DIR),
+                    str(
+                        APP_DIR
+                    ),
 
                 "Status":
                     "READY"
@@ -3208,7 +3929,9 @@ elif dashboard_view == "🚀 Deployment & Validation":
                     "Tests directory",
 
                 "Value":
-                    str(TESTS_DIR),
+                    str(
+                        TESTS_DIR
+                    ),
 
                 "Status":
                     "READY"
@@ -3311,8 +4034,6 @@ elif dashboard_view == "🚀 Deployment & Validation":
         "3. Application Module Health"
     )
 
-    module_rows = []
-
     expected_modules = [
         "analytics",
         "behavior",
@@ -3325,7 +4046,10 @@ elif dashboard_view == "🚀 Deployment & Validation":
         "statistical",
         "multiresolution",
         "cross_context",
+        "adaptive_response",
     ]
+
+    module_rows = []
 
     for name in expected_modules:
 
@@ -3346,12 +4070,17 @@ elif dashboard_view == "🚀 Deployment & Validation":
                 "Details":
                     ""
                     if name in MODULES
-                    else str(error or "Import failed"),
+                    else str(
+                        error
+                        or "Import failed"
+                    ),
             }
         )
 
     st.dataframe(
-        pd.DataFrame(module_rows),
+        pd.DataFrame(
+            module_rows
+        ),
         width="stretch",
         hide_index=True,
     )
@@ -3359,7 +4088,7 @@ elif dashboard_view == "🚀 Deployment & Validation":
     st.divider()
 
     # --------------------------------------------------------
-    # Project files
+    # Required project files
     # --------------------------------------------------------
 
     st.subheader(
@@ -3368,22 +4097,29 @@ elif dashboard_view == "🚀 Deployment & Validation":
 
     important_files = [
         "dashboard.py",
+
         "app/analytics.py",
         "app/behavior.py",
         "app/attack_scenarios.py",
+        "app/investigation.py",
         "app/experimental_dataset.py",
+        "app/evaluation.py",
         "app/comparison.py",
         "app/repeated_evaluation.py",
         "app/statistical_evaluation.py",
         "app/multiresolution_behavior.py",
         "app/cross_context_correlation.py",
+        "app/adaptive_response.py",
     ]
 
     file_rows = []
 
     for relative_path in important_files:
 
-        path = PROJECT_ROOT / relative_path
+        path = (
+            PROJECT_ROOT
+            / relative_path
+        )
 
         file_rows.append(
             {
@@ -3394,14 +4130,18 @@ elif dashboard_view == "🚀 Deployment & Validation":
                     path.exists(),
 
                 "Size":
-                    path.stat().st_size
-                    if path.exists()
-                    else 0,
+                    (
+                        path.stat().st_size
+                        if path.exists()
+                        else 0
+                    ),
             }
         )
 
     st.dataframe(
-        pd.DataFrame(file_rows),
+        pd.DataFrame(
+            file_rows
+        ),
         width="stretch",
         hide_index=True,
     )
@@ -3409,11 +4149,16 @@ elif dashboard_view == "🚀 Deployment & Validation":
     st.divider()
 
     # --------------------------------------------------------
-    # Full test suite
+    # Full pytest suite
     # --------------------------------------------------------
 
     st.subheader(
         "5. Full Automated Test Suite"
+    )
+
+    st.caption(
+        "pytest is executed with the same Python interpreter "
+        "running the dashboard."
     )
 
     if st.button(
@@ -3423,7 +4168,7 @@ elif dashboard_view == "🚀 Deployment & Validation":
     ):
 
         with st.spinner(
-            "Running pytest..."
+            "Running complete pytest suite..."
         ):
 
             try:
@@ -3449,21 +4194,35 @@ elif dashboard_view == "🚀 Deployment & Validation":
                     + completed.stderr
                 )
 
-                passed = (
-                    completed.returncode == 0
-                )
-
                 st.session_state[
                     "test_result"
                 ] = {
                     "passed":
-                        passed,
+                        completed.returncode == 0,
 
                     "returncode":
                         completed.returncode,
 
                     "output":
                         output,
+
+                    "timestamp":
+                        datetime.now().isoformat(),
+                }
+
+            except subprocess.TimeoutExpired:
+
+                st.session_state[
+                    "test_result"
+                ] = {
+                    "passed":
+                        False,
+
+                    "returncode":
+                        -1,
+
+                    "output":
+                        "pytest timed out after 300 seconds.",
 
                     "timestamp":
                         datetime.now().isoformat(),
@@ -3493,7 +4252,10 @@ elif dashboard_view == "🚀 Deployment & Validation":
 
     if test_result:
 
-        if test_result["passed"]:
+        if test_result.get(
+            "passed",
+            False,
+        ):
 
             st.success(
                 "FULL TEST SUITE PASSED"
@@ -3505,15 +4267,28 @@ elif dashboard_view == "🚀 Deployment & Validation":
                 "FULL TEST SUITE FAILED"
             )
 
+        st.caption(
+            "Validation time: "
+            + str(
+                test_result.get(
+                    "timestamp",
+                    "",
+                )
+            )
+        )
+
         st.code(
-            test_result["output"],
+            test_result.get(
+                "output",
+                "",
+            ),
             language="text",
         )
 
     else:
 
         st.info(
-            "Run the full test suite to verify the current project."
+            "Run the full test suite to obtain actual validation status."
         )
 
     st.divider()
@@ -3521,6 +4296,10 @@ elif dashboard_view == "🚀 Deployment & Validation":
     # --------------------------------------------------------
     # Deployment verdict
     # --------------------------------------------------------
+
+    st.subheader(
+        "6. Deployment Readiness"
+    )
 
     tests_passed = bool(
         test_result
@@ -3537,10 +4316,63 @@ elif dashboard_view == "🚀 Deployment & Validation":
         for path in important_files
     )
 
+    modules_ready = all(
+        name in MODULES
+        for name in expected_modules
+    )
+
     deployment_ready = (
         environment_ok
         and tests_passed
         and required_files_ready
+        and modules_ready
+    )
+
+    readiness_df = pd.DataFrame(
+        [
+            {
+                "Requirement":
+                    "D: Python environment",
+
+                "Status":
+                    "READY"
+                    if environment_ok
+                    else "NOT READY",
+            },
+            {
+                "Requirement":
+                    "Application modules",
+
+                "Status":
+                    "READY"
+                    if modules_ready
+                    else "NOT READY",
+            },
+            {
+                "Requirement":
+                    "Required files",
+
+                "Status":
+                    "READY"
+                    if required_files_ready
+                    else "NOT READY",
+            },
+            {
+                "Requirement":
+                    "Automated tests",
+
+                "Status":
+                    "PASSED"
+                    if tests_passed
+                    else "NOT VERIFIED",
+            },
+        ]
+    )
+
+    st.dataframe(
+        readiness_df,
+        width="stretch",
+        hide_index=True,
     )
 
     if deployment_ready:
@@ -3552,7 +4384,7 @@ elif dashboard_view == "🚀 Deployment & Validation":
     else:
 
         st.warning(
-            "Deployment readiness has not been established."
+            "Deployment readiness has NOT been established."
         )
 
 
@@ -3568,7 +4400,7 @@ elif dashboard_view == "⚙️ System Status":
 
     status_rows = []
 
-    for name in [
+    expected_modules = [
         "analytics",
         "behavior",
         "scenarios",
@@ -3580,7 +4412,10 @@ elif dashboard_view == "⚙️ System Status":
         "statistical",
         "multiresolution",
         "cross_context",
-    ]:
+        "adaptive_response",
+    ]
+
+    for name in expected_modules:
 
         status_rows.append(
             {
@@ -3601,7 +4436,9 @@ elif dashboard_view == "⚙️ System Status":
         )
 
     st.dataframe(
-        pd.DataFrame(status_rows),
+        pd.DataFrame(
+            status_rows
+        ),
         width="stretch",
         hide_index=True,
     )
@@ -3633,21 +4470,27 @@ elif dashboard_view == "⚙️ System Status":
                     "Project",
 
                 "Value":
-                    str(PROJECT_ROOT),
+                    str(
+                        PROJECT_ROOT
+                    ),
             },
             {
                 "Property":
                     "App",
 
                 "Value":
-                    str(APP_DIR),
+                    str(
+                        APP_DIR
+                    ),
             },
             {
                 "Property":
                     "Tests",
 
                 "Value":
-                    str(TESTS_DIR),
+                    str(
+                        TESTS_DIR
+                    ),
             },
         ]
     )
@@ -3685,7 +4528,9 @@ elif dashboard_view == "⚙️ System Status":
         )
 
     st.dataframe(
-        pd.DataFrame(session_rows),
+        pd.DataFrame(
+            session_rows
+        ),
         width="stretch",
         hide_index=True,
     )
@@ -3701,7 +4546,9 @@ elif dashboard_view == "⚙️ System Status":
 
             if key in st.session_state:
 
-                del st.session_state[key]
+                del st.session_state[
+                    key
+                ]
 
         st.rerun()
 
@@ -3718,11 +4565,12 @@ st.markdown(
         🛡️ <strong>AegisGuard</strong>
         • Behavior-Aware Security for Autonomous AI Agents
         <br>
-        Day 1–29 Unified Research Dashboard
+        Day 1–30 Unified Research Dashboard
         • Controlled Evaluation
         • Reproducible Experiments
         • Statistical Validation
-        • Cross-Context Behavioral Intelligence
+        • Cross-Context Intelligence
+        • Adaptive Runtime Response
     </div>
     """,
     unsafe_allow_html=True,

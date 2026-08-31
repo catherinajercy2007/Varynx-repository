@@ -1,199 +1,287 @@
-# 🛡️ AegisGuard
+🛡️ Varynx
 
-## Behavior-Aware Security Control Plane for Autonomous AI Agents
+Cloud-Native Behavioral Risk Control for Autonomous AI Agents
 
-**AegisGuard** is a research-oriented cybersecurity framework designed to protect autonomous and semi-autonomous AI agents from **unauthorized actions, privilege misuse, policy violations, abnormal behavioral patterns, and potentially malicious activity**.
+Varynx Behavioral Risk Control Engine is a research-oriented cybersecurity platform for evaluating how continuous behavioral evidence can improve runtime security decisions for autonomous AI agents.
 
-Rather than treating authorization as a one-time `ALLOW` or `DENY` decision, AegisGuard explores a layered security model in which an agent's **identity, task, requested action, resource, risk context, historical behavior, and anomaly signals** are continuously evaluated.
+The project evolved from AegisGuard into Varynx as its architecture expanded from basic authorization and risk assessment toward:
 
-The long-term objective is to develop a practical security control plane capable of operating between autonomous agents and the resources they are permitted to access.
+Behavioral monitoring
 
----
+Multi-resolution behavioral analysis
 
-## 🚨 The Problem
+Cross-context correlation
 
-AI agents are moving beyond simple question answering.
+Adaptive graduated response
 
-Modern agents can:
+Security investigation
 
-* Execute system commands
-* Read and modify files
-* Query databases
-* Call APIs
-* Access cloud resources
-* Manipulate application state
-* Use external tools
-* Perform multi-step workflows
-* Make decisions with limited human intervention
+Controlled adversarial scenarios
 
-This creates a security problem that traditional access control does not fully address.
+Reproducible evaluation
 
-A conventional authorization system may answer:
+Baseline comparison
 
-> **"Is this agent allowed to perform this action?"**
+Statistical analysis
 
-But autonomous systems introduce additional questions:
+Security audit evidence
 
-> **"Is this action appropriate for the current task?"**
+Research position: Varynx does not claim that behavioral security for AI agents is universally novel or that the system is inherently more secure than existing approaches. Its research objective is to experimentally investigate whether combining behavioral evidence, cross-context analysis, and adaptive enforcement provides measurable benefits over simpler security baselines.
 
-> **"Is the requested resource consistent with the agent's normal behavior?"**
+🎯 Project at a Glance
 
-> **"Is the agent gradually attempting higher-risk operations?"**
+Area
 
-> **"Has this agent repeatedly violated authorization boundaries?"**
+Varynx
 
-> **"Does the current behavior significantly differ from its historical profile?"**
+Domain
 
-> **"Should the security system increase scrutiny even if the individual request is technically permitted?"**
+Cybersecurity / AI Security
 
-These questions create a gap between **static authorization** and **behavior-aware security**.
+Focus
 
-AegisGuard is designed to investigate and address that gap.
+Autonomous AI Agent Runtime Security
 
----
+Architecture
 
-# 🎯 Research Problem Statement
+Behavior-aware security control engine
 
-### Core Problem
+Primary Language
 
-> **How can autonomous AI agents be continuously monitored and controlled using a security architecture that combines deterministic authorization, contextual risk assessment, behavioral profiling, audit evidence, and anomaly detection without relying exclusively on machine-learning decisions?**
+Python
 
-The project investigates whether a layered security model can provide stronger protection for autonomous agents than isolated request-level authorization.
+Dashboard
 
----
+Streamlit
 
-# 💡 Proposed Solution
+Data Store
 
-AegisGuard introduces a **multi-layer agent security architecture**:
+SQLite
 
-```text
+Testing
+
+Pytest
+
+Analysis
+
+Pandas / statistical evaluation
+
+Version Control
+
+Git / GitHub
+
+Development Model
+
+Incremental research & engineering
+
+Current Milestone
+
+Day 42 — Security Investigation
+
+Current Git Branch
+
+day30-adaptive-response
+
+🚨 The Problem
+
+Autonomous AI agents increasingly interact with:
+
+APIs
+
+Databases
+
+Files
+
+Cloud services
+
+External tools
+
+System resources
+
+Other agents
+
+Multi-step workflows
+
+Traditional authorization can answer:
+
+Is this action permitted?
+
+But runtime security may also need to ask:
+
+Is the action appropriate for the current task?
+
+Is the requested resource consistent with the agent's behavior?
+
+Has the agent repeatedly attempted denied operations?
+
+Is the agent's behavior changing over time?
+
+Does activity across multiple contexts reveal a broader security pattern?
+
+Should the system increase monitoring rather than immediately allowing or denying the operation?
+
+Varynx investigates these questions through a layered security architecture.
+
+🧠 Core Research Proposition
+
+The central research proposition is:
+
+Identity
+    ↓
+Authorization
+    ↓
+Risk Assessment
+    ↓
+Behavioral Evidence
+    ↓
+Multi-Resolution Analysis
+    ↓
+Cross-Context Correlation
+    ↓
+Adaptive Response
+    ↓
+Audit / Investigation
+    ↓
+Security Operations
+
+The hypothesis is testable, not assumed:
+
+Combining multiple sources of behavioral evidence may provide useful security information beyond isolated request-level authorization or risk scoring.
+
+The project therefore emphasizes:
+
+controlled experiments,
+
+baseline comparison,
+
+repeated evaluation,
+
+statistical analysis,
+
+ablation studies,
+
+adversarial testing,
+
+robustness testing,
+
+operational measurements.
+
+🏗️ Architecture
+
                     AUTONOMOUS AI AGENT
-                            │
-                            ▼
-                 ┌─────────────────────┐
-                 │ Request Interceptor │
-                 └──────────┬──────────┘
-                            │
-                            ▼
-                 ┌─────────────────────┐
-                 │ Identity & Context  │
-                 │ Validation          │
-                 └──────────┬──────────┘
-                            │
-                            ▼
-                 ┌─────────────────────┐
-                 │ Policy-Based        │
-                 │ Authorization       │
-                 └──────────┬──────────┘
-                            │
-                            ▼
-                 ┌─────────────────────┐
-                 │ Contextual Risk     │
-                 │ Assessment          │
-                 └──────────┬──────────┘
-                            │
-                   ┌────────┴────────┐
-                   ▼                 ▼
-                ALLOW               DENY
-                   │
-                   ▼
-        ┌──────────────────────────────┐
-        │ Security Audit & Telemetry   │
-        └──────────────┬───────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │ Behavioral Profiling         │
-        └──────────────┬───────────────┘
-                       │
-              ┌────────┴────────┐
-              ▼                 ▼
-       Rule-Based Analysis   ML Analysis
-              │                 │
-              └────────┬────────┘
-                       ▼
-        ┌──────────────────────────────┐
-        │ Anomaly / Threat Signal      │
-        └──────────────┬───────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │ Security Operations Dashboard│
-        └──────────────────────────────┘
-```
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ Request / Context   │
+                  │     Interception    │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ Identity & Task     │
+                  │     Context         │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ Policy-Based        │
+                  │ Authorization       │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ Risk Assessment     │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ Security Audit      │
+                  │ & Event Evidence    │
+                  └──────────┬──────────┘
+                             │
+                ┌────────────┴────────────┐
+                ▼                         ▼
+       Behavioral Analysis        Cross-Context Analysis
+                │                         │
+                └────────────┬────────────┘
+                             ▼
+                  ┌─────────────────────┐
+                  │ Adaptive Response   │
+                  │                     │
+                  │ Allow                │
+                  │ Monitor              │
+                  │ Step-up Verification │
+                  │ Restrict             │
+                  │ Deny                 │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  ┌─────────────────────┐
+                  │ Investigation &     │
+                  │ Security Dashboard  │
+                  └─────────────────────┘
 
----
+🔐 Security Philosophy
 
-# 🔐 Core Security Philosophy
+Varynx follows a defense-in-depth model.
 
-AegisGuard follows a **defense-in-depth** model.
+No single signal is treated as proof of malicious intent.
 
-No single component is expected to determine whether an agent is malicious.
-
-Instead:
-
-```text
 Identity
    +
 Task Context
    +
 Authorization Policy
    +
-Risk Assessment
+Risk
    +
 Audit Evidence
    +
-Behavioral Profile
+Behavior
    +
-Anomaly Detection
+Cross-Context Evidence
    ↓
 Security Decision Support
-```
 
-This distinction is fundamental to the project.
+Important design principles
 
-### ML is not the authorization authority.
+Authorization remains an enforcement boundary.
 
-A machine-learning model may identify unusual behavior, but an anomaly score alone does not prove malicious intent.
+Risk scoring is a signal, not absolute truth.
 
-AegisGuard therefore separates:
+Behavioral correlation does not prove malicious intent.
 
-**Security enforcement**
+ML/anomaly detection should not automatically become the authorization authority.
 
-from
+Security decisions should be explainable and auditable.
 
-**Security intelligence**
+Detection and enforcement should remain conceptually separable.
 
-This makes the architecture safer and more explainable.
+Experimental claims must be reproducible.
 
----
+More complexity is not automatically better.
 
-# 🧩 Major Components
+🧩 Core Capabilities
 
-## 1. Agent Identity & Security Context
+1. Agent Identity and Context
 
-Every request is associated with security context such as:
+Security events associate activity with contextual information such as:
 
-```text
 Agent ID
 Task ID
 Action
 Resource
 Timestamp
-Security Policy
-```
+Policy Context
 
-This establishes the context required for evaluating agent behavior.
+This provides the foundation for contextual security decisions.
 
----
+2. Policy-Based Authorization
 
-## 2. Policy-Based Authorization
-
-AegisGuard evaluates whether an agent is permitted to perform a requested operation.
+Varynx evaluates whether an agent is authorized to perform an operation.
 
 Example:
 
-```text
 Agent:
 data-analysis-agent
 
@@ -208,53 +296,43 @@ sales_database
 
 Decision:
 ALLOW
-```
 
-An unauthorized request may produce:
+An unauthorized request can produce:
 
-```text
 Decision:
 DENY
 
 Reason:
 Resource not permitted for current task
-```
 
----
+3. Contextual Risk Assessment
 
-# ⚠️ 3. Contextual Risk Assessment
-
-Authorization alone is insufficient for autonomous systems.
-
-AegisGuard therefore assigns a security risk signal to requests.
+Risk provides an additional security signal.
 
 Example:
 
-```text
 Risk Score: 82
 Decision: DENY
 Reason: High-risk unauthorized resource access
-```
 
-Risk information can be used for:
+Risk can support:
 
-* Prioritization
-* Monitoring
-* Investigation
-* Behavioral analysis
-* Security alerting
+Prioritization
 
-Risk scores are treated as **signals**, not absolute truth.
+Monitoring
 
----
+Investigation
 
-# 📝 4. Security Audit & Telemetry
+Behavioral analysis
 
-Every important security decision should generate evidence.
+Adaptive response
 
-Representative audit fields include:
+Risk is not treated as ground truth.
 
-```text
+4. Security Event and Audit Evidence
+
+Security events capture evidence such as:
+
 timestamp
 agent_id
 task_id
@@ -263,106 +341,35 @@ resource
 decision
 risk
 reason
-```
 
-The audit layer enables:
+This evidence supports:
 
-* Incident investigation
-* Behavioral profiling
-* Historical analysis
-* Security reporting
-* Anomaly detection
-* Reproducible experiments
+Historical analysis
 
----
+Behavioral profiling
 
-# 🧠 5. Behavioral Profiling
+Investigation
 
-AegisGuard moves beyond individual requests by constructing behavioral profiles for agents.
+Security analytics
 
-Example:
+Reproducible experiments
 
-```text
-Agent: research-agent
+Auditability
 
-Requests:           184
-Allowed:            169
-Denied:              15
-Denial Rate:        8.15%
-Average Risk:       24.7
-Maximum Risk:       91
-High-Risk Events:    6
-Unique Resources:   12
-Unique Actions:      5
-```
+🧠 Behavioral Intelligence
 
-The objective is to understand:
+Behavioral Profiling
 
-> **What does normal behavior look like for this agent?**
+Varynx analyzes historical activity to establish observable agent behavior.
 
-Once a baseline exists, deviations can be investigated.
+Representative features include:
 
----
-
-# 🔎 6. Suspicious Behavior Detection
-
-AegisGuard can identify behavioral indicators such as:
-
-* Repeated authorization failures
-* High-risk request bursts
-* Unexpected resource access
-* Unusual action patterns
-* Rapid resource expansion
-* Abnormal denial rates
-* Significant deviation from historical behavior
-
-Agents can initially be categorized using deterministic behavioral rules:
-
-```text
-NORMAL
-ELEVATED
-SUSPICIOUS
-```
-
-These rule-based signals provide interpretable security evidence before introducing more complex models.
-
----
-
-# 🤖 7. ML-Assisted Anomaly Detection
-
-The research phase extends behavioral analysis toward machine learning.
-
-The intended pipeline is:
-
-```text
-Audit Events
-     │
-     ▼
-Feature Engineering
-     │
-     ▼
-Behavioral Feature Matrix
-     │
-     ▼
-Anomaly Detection
-     │
-     ▼
-Anomaly Score
-     │
-     ▼
-Investigation / Alert
-```
-
-Potential behavioral features include:
-
-```text
 request_count
 allow_count
 deny_count
 deny_rate
 average_risk
 maximum_risk
-risk_variance
 high_risk_count
 unique_resources
 unique_actions
@@ -370,704 +377,1002 @@ unique_tasks
 request_frequency
 resource_diversity
 action_diversity
-```
 
-The initial research direction can investigate unsupervised approaches such as:
+The goal is to characterize:
 
-* Isolation Forest
-* Local Outlier Factor
-* One-Class SVM
-* Clustering-based behavioral profiling
-* Statistical anomaly detection
+What does the agent's observed behavior look like over time?
 
-The project will evaluate models based on **security usefulness, interpretability, stability, false-positive behavior, and computational cost**, rather than assuming that a more complex model is automatically better.
+A deviation is treated as evidence requiring analysis, not automatically as malicious activity.
 
----
+🔎 Multi-Resolution Behavioral Analysis
 
-# 🖥️ 8. Security Operations Dashboard
+Varynx analyzes behavior at multiple resolutions:
 
-AegisGuard provides a Streamlit-based security monitoring interface.
+Action
+   ↓
+Capability
+   ↓
+Resource
+   ↓
+Context
+   ↓
+Agent
+   ↓
+Population / Cross-Agent
 
-The dashboard is intended to evolve into a lightweight SOC-style interface.
+This allows the research to investigate whether a pattern that appears normal at one resolution becomes unusual when multiple dimensions are considered together.
 
-### Security Overview
+Potential dimensions include:
 
-```text
-┌────────────┬────────────┬────────────┬────────────┐
-│   Events   │   Allowed  │   Denied   │ High Risk  │
-├────────────┼────────────┼────────────┼────────────┤
-│ Suspicious │ Avg Risk   │ Max Risk   │ Anomalies  │
-└────────────┴────────────┴────────────┴────────────┘
-```
+Action diversity
 
-### Monitoring capabilities
+Capability diversity
 
-* Authorization activity
-* Risk distribution
-* Agent activity
-* Suspicious agents
-* Repeated denials
-* High-risk events
-* Behavioral anomalies
-* Security event investigation
-* Historical activity analysis
+Resource diversity
 
----
+Context diversity
 
-# 🏗️ Research Architecture
+Temporal behavior
 
-The long-term architecture is structured around five layers:
+Denial patterns
 
-```text
-┌──────────────────────────────────────────┐
-│          Agent Interaction Layer        │
-├──────────────────────────────────────────┤
-│          Security Enforcement Layer     │
-│  Identity | Policy | Authorization      │
-├──────────────────────────────────────────┤
-│          Risk & Monitoring Layer        │
-│  Risk | Audit | Telemetry               │
-├──────────────────────────────────────────┤
-│          Behavioral Intelligence        │
-│  Profiling | Rules | Anomaly Detection  │
-├──────────────────────────────────────────┤
-│          Security Operations Layer      │
-│  Dashboard | Alerts | Investigation     │
-└──────────────────────────────────────────┘
-```
+Risk
 
-This separation allows individual security mechanisms to be evaluated independently.
+Behavioral entropy
 
----
+🌐 Cross-Context Behavioral Correlation
 
-# 🔬 Research Questions
+An autonomous agent can operate across multiple contexts.
 
-The project is designed around research questions such as:
+For example:
 
-### RQ1 — Authorization
+Context A
+   ↓
+Capability X
+   ↓
+Resource A
 
-> Can contextual, task-aware authorization reduce unauthorized agent actions compared with simple permission checks?
+Context B
+   ↓
+Capability Y
+   ↓
+Resource B
 
-### RQ2 — Risk
+Context C
+   ↓
+Capability Z
+   ↓
+Resource C
 
-> Can contextual risk scoring improve prioritization of potentially dangerous agent requests?
+Varynx can analyze relationships between these observations.
 
-### RQ3 — Behavioral Security
+The output is behavioral evidence, not proof of intent.
 
-> Can historical agent behavior provide useful evidence for identifying suspicious activity?
+This distinction is essential:
 
-### RQ4 — Anomaly Detection
+Correlation ≠ Malicious Intent
 
-> Can unsupervised machine-learning methods identify meaningful deviations from established agent behavior?
+⚡ Adaptive Response
 
-### RQ5 — False Positives
+Varynx introduces graduated response rather than forcing every situation into a binary decision.
 
-> How can behavioral and ML-based detection improve security without generating excessive false positives?
+Conceptually:
 
-### RQ6 — Explainability
+LOW
+ ↓
+ALLOW
 
-> Can anomaly detection produce security signals that investigators can understand and validate?
+MODERATE
+ ↓
+ALLOW_WITH_MONITORING
 
-### RQ7 — Defense in Depth
+ELEVATED
+ ↓
+STEP_UP_VERIFICATION
 
-> Does combining deterministic authorization with behavioral intelligence provide stronger security coverage than either approach independently?
+HIGH
+ ↓
+RESTRICT
 
----
+CRITICAL
+ ↓
+DENY
 
-# 🧪 Experimental Methodology
+The exact thresholds are configuration-driven and must be validated experimentally.
 
-AegisGuard is intended to be evaluated experimentally rather than only demonstrated through screenshots.
+The objective is to investigate whether adaptive enforcement can reduce unnecessary disruption while increasing scrutiny when security evidence changes.
 
-The evaluation pipeline is:
+🔍 Security Investigation
 
-```text
-Normal Agent Behavior
-        │
-        ▼
-Baseline Collection
-        │
-        ▼
-Controlled Security Violations
-        │
-        ▼
-Behavioral Feature Extraction
-        │
-        ▼
-Detection Models
-        │
-        ▼
-Evaluation
-        │
-        ▼
-Security Analysis
-```
+The Day 42 investigation layer provides a structured evidence interface over security events.
 
----
+Current investigation capabilities include:
 
-# 🧬 Threat Scenarios
+Agent filtering
+Task filtering
+Action filtering
+Resource filtering
+Decision filtering
+Risk-level filtering
+Minimum-risk filtering
+Maximum-risk filtering
+Time-range filtering
+Event lookup
+Event counting
 
-The research environment can simulate controlled scenarios including:
+The investigation layer also provides programmatic analysis for:
 
-### Scenario 1 — Unauthorized Resource Access
+Investigation timelines
+Agent profiles
+Risk histories
+Decision histories
+Suspicious-event identification
+Evidence aggregation
+Structured investigation reports
 
-An agent attempts to access a resource outside its policy.
+Investigation is designed as an evidence layer between raw security events and analyst-facing security operations.
 
-```text
+🧪 Controlled Security Scenarios
+
+The project uses controlled scenarios to support reproducible experiments.
+
+Examples include:
+
+Unauthorized Resource Access
+
+An agent attempts to access a resource outside its authorization policy.
+
 Expected:
 DENY
-```
 
-### Scenario 2 — Repeated Authorization Abuse
+Repeated-Denial Probing
 
 An agent repeatedly attempts prohibited operations.
 
-```text
 Expected:
-Behavioral escalation
-```
+Behavioral escalation signal
 
-### Scenario 3 — Privilege Expansion
+Privilege Expansion
 
-An agent gradually attempts increasingly sensitive resources.
+An agent progressively requests more sensitive resources.
 
-```text
 Expected:
-Risk escalation
-```
+Increasing security evidence
 
-### Scenario 4 — Behavioral Drift
+Behavioral Drift
 
-An agent changes from its normal activity profile.
+An agent changes its normal activity profile.
 
-```text
 Expected:
-Anomaly signal
-```
+Behavioral deviation signal
 
-### Scenario 5 — High-Risk Burst
+High-Risk Burst
 
-An agent suddenly generates multiple high-risk operations.
+An agent generates multiple high-risk operations in a short period.
 
-```text
 Expected:
-Elevated monitoring / investigation
-```
+Increased monitoring / investigation
 
-### Scenario 6 — Legitimate High-Activity Agent
+Legitimate High Activity
 
-An agent performs many legitimate requests.
+A legitimate agent generates a large number of valid requests.
 
-```text
 Expected:
-High activity ≠ automatically malicious
-```
+High activity alone ≠ malicious
 
-This scenario is important for measuring false positives.
+The final research evaluation should distinguish attack scenarios from legitimate unusual behavior.
 
----
+📊 Experimental Evaluation
 
-# 📊 Evaluation Metrics
+Varynx is being developed as a research system, so feature demonstrations alone are insufficient.
 
-The research phase will evaluate security mechanisms using measurable metrics.
+The experimental workflow is:
 
-## Detection Metrics
+Controlled Scenario
+        ↓
+Ground Truth
+        ↓
+Experimental Dataset
+        ↓
+Security Detector
+        ↓
+Baseline Comparison
+        ↓
+Repeated Evaluation
+        ↓
+Statistical Analysis
+        ↓
+Ablation / Robustness
+        ↓
+Research Conclusion
 
-```text
+📈 Evaluation Metrics
+
+Detection Metrics
+
+Accuracy
 Precision
 Recall
 F1 Score
+Specificity
 False Positive Rate
 False Negative Rate
-Detection Rate
-```
 
-## Operational Metrics
+Operational Metrics
 
-```text
-Detection Latency
-Processing Time
+Decision Latency
+Event Processing Latency
+Throughput
+CPU Usage
 Memory Usage
-Requests Per Second
-Model Training Time
-Inference Time
-```
+Database Overhead
 
-## Security Metrics
+Security Metrics
 
-```text
 Unauthorized Actions Blocked
 High-Risk Events Detected
-Suspicious Agents Identified
+Suspicious Activity Identified
 Behavioral Deviations Detected
 Repeated Abuse Detected
-```
 
-The project should report these metrics using controlled experiments rather than relying only on anecdotal examples.
+Actual numerical results will only be reported after the corresponding experiments are executed.
 
----
+🧪 Baseline and Ablation Strategy
 
-# 📈 Research Evaluation Strategy
+A major research requirement is determining whether each Varynx component contributes measurable value.
 
-AegisGuard can compare progressively stronger security configurations:
+Planned comparisons include:
 
-```text
-Experiment A
-Traditional Authorization
-        ↓
 Baseline
+Static / request-level authorization
 
-Experiment B
-Authorization + Risk Scoring
-        ↓
-Improved Contextual Detection
+        vs
 
-Experiment C
-Authorization + Risk + Behavioral Rules
-        ↓
-Behavior-Aware Security
+Baseline + Risk
 
-Experiment D
-Authorization + Risk + Behavioral Rules + ML
-        ↓
-Full AegisGuard Architecture
-```
+        vs
 
-This makes it possible to investigate whether each additional layer provides measurable security benefits.
+Baseline + Risk + Behavioral Evidence
 
----
+        vs
 
-# 🧪 Testing Strategy
+Baseline + Risk + Behavioral
++ Multi-Resolution
 
-The project uses automated testing to validate security behavior.
+        vs
 
-Run:
+Baseline + Risk + Behavioral
++ Multi-Resolution
++ Cross-Context
 
-```powershell
-python -m pytest -q
-```
+        vs
 
-Testing areas include:
+Full Varynx
++ Adaptive Response
 
-* Authorization enforcement
-* Invalid actions
-* Unauthorized resources
-* Policy violations
-* Risk evaluation
-* Abuse scenarios
-* Audit logging
-* Security analytics
-* Behavioral analysis
-* Anomaly detection
+Ablation experiments should evaluate configurations such as:
 
-Security tests should be expanded alongside every new security capability.
+Full Varynx
 
----
+Varynx - Behavioral Features
 
-# 📁 Project Structure
+Varynx - Multi-Resolution
 
-The architecture is expected to evolve toward:
+Varynx - Cross-Context Correlation
 
-```text
+Varynx - Adaptive Response
+
+This prevents the project from assuming that every additional component automatically improves security.
+
+🔬 Reproducibility
+
+Experiments use controlled datasets and multiple random seeds where applicable.
+
+The methodology emphasizes:
+
+deterministic configuration,
+
+reproducible scenario generation,
+
+multiple seeds,
+
+explicit ground truth,
+
+consistent metrics,
+
+confidence intervals where appropriate,
+
+effect-size analysis,
+
+statistical testing where justified.
+
+A statistical claim is made only when the underlying calculation has actually been performed.
+
+🛡️ Robustness and Adversarial Evaluation
+
+The research roadmap includes testing against:
+
+Different random seeds
+
+Different event volumes
+
+Different attack ratios
+
+Behavioral noise
+
+Threshold changes
+
+Slow behavioral drift
+
+Low-and-slow attacks
+
+Repeated authorization probing
+
+Privilege expansion
+
+Cross-context behavior
+
+Legitimate high-activity agents
+
+The goal is not to demonstrate that Varynx cannot be bypassed.
+
+The goal is to understand where the system works, where it fails, and under which conditions its evidence becomes unreliable.
+
+🖥️ Streamlit Security Dashboard
+
+Varynx includes a Streamlit-based research and security operations interface.
+
+The dashboard is being developed as a unified interface for:
+
+Security overview
+
+Risk intelligence
+
+Agent intelligence
+
+Behavioral analytics
+
+High-risk events
+
+Security investigation
+
+Controlled scenarios
+
+Experimental datasets
+
+Quantitative evaluation
+
+Baseline comparison
+
+Repeated evaluation
+
+Statistical evaluation
+
+Multi-resolution behavior
+
+Cross-context intelligence
+
+Adaptive response
+
+Research interpretation
+
+Deployment validation
+
+System health
+
+Run the dashboard with:
+
+python -m streamlit run dashboard.py
+
+Then open:
+
+http://localhost:8501
+
+Current note: Day 42 backend investigation functionality is implemented and tested incrementally. Dashboard integration is being hardened separately and should not be treated as complete until the current dashboard and full test suite verify it.
+
+📁 Project Structure
+
 aegis-agent-firewall/
 │
 ├── app/
 │   ├── __init__.py
 │   ├── authorization.py
 │   ├── risk.py
+│   ├── security.py
+│   ├── audit.py
 │   ├── analytics.py
 │   ├── behavior.py
-│   ├── features.py
-│   ├── anomaly.py
-│   ├── monitoring.py
+│   ├── attack_scenarios.py
+│   ├── experimental_dataset.py
+│   ├── evaluation.py
+│   ├── comparison.py
+│   ├── repeated_evaluation.py
+│   ├── statistical_evaluation.py
+│   ├── multiresolution_behavior.py
+│   ├── cross_context_correlation.py
+│   ├── adaptive_response.py
+│   ├── event_schema.py
+│   ├── investigation.py
 │   └── ...
 │
 ├── tests/
 │   ├── test_authorization.py
 │   ├── test_risk.py
 │   ├── test_security.py
-│   ├── test_analytics.py
-│   ├── test_behavior.py
-│   ├── test_features.py
-│   ├── test_anomaly.py
+│   ├── test_audit_evidence.py
+│   ├── test_event_schema.py
+│   ├── test_investigation.py
 │   └── ...
 │
 ├── dashboard.py
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
-│
-└── runtime/
-    ├── aegisguard.db
-    └── audit logs
-```
+└── aegisguard.db
 
-Runtime artifacts should remain excluded from version control.
+The SQLite database and other runtime artifacts should normally remain outside version control.
 
----
+🛠️ Technology Stack
 
-# 🛠️ Technology Stack
+Technology
 
-| Technology       | Role                          |
-| ---------------- | ----------------------------- |
-| **Python**       | Core security framework       |
-| **SQLite**       | Audit and behavioral data     |
-| **Streamlit**    | Security monitoring interface |
-| **Pandas**       | Data processing               |
-| **Pytest**       | Security testing              |
-| **Scikit-learn** | ML/anomaly detection research |
-| **Git**          | Version control               |
-| **GitHub**       | Research/project repository   |
+Purpose
 
-Additional technologies may be introduced during the research phase when justified by experimental requirements.
+Python
 
----
+Core security and research implementation
 
-# 🚀 Getting Started
+SQLite
 
-## Clone
+Security event and audit storage
 
-```powershell
-git clone <YOUR_GITHUB_REPOSITORY_URL>
+Streamlit
+
+Security/research dashboard
+
+Pandas
+
+Data analysis and tabular processing
+
+Pytest
+
+Automated testing
+
+SciPy
+
+Statistical analysis where required
+
+Scikit-learn
+
+Experimental anomaly-detection research
+
+Git
+
+Version control
+
+GitHub
+
+Source-code and research portfolio
+
+Technologies are added only when they provide a justified engineering or research benefit.
+
+🚀 Getting Started
+
+1. Clone the repository
+
+git clone https://github.com/catherinajercy2007/AegisGuard-repository.git
 cd aegis-agent-firewall
-```
 
-## Create environment
+2. Create a virtual environment
 
-```powershell
 python -m venv .venv
-```
 
-Activate:
+Activate on Windows PowerShell:
 
-```powershell
 .\.venv\Scripts\Activate.ps1
-```
 
-## Install dependencies
+If you already maintain a project environment, activate that environment instead.
 
-```powershell
-pip install -r requirements.txt
-```
+3. Install dependencies
 
-## Run tests
+python -m pip install -r requirements.txt
 
-```powershell
+4. Run the test suite
+
 python -m pytest -q
-```
 
-## Start dashboard
+5. Start the Streamlit dashboard
 
-```powershell
 python -m streamlit run dashboard.py
-```
 
-Open:
+🧪 Development Workflow
 
-```text
-http://localhost:8501
-```
+The project follows an incremental development model.
 
----
+A typical development cycle is:
 
-# 🔄 90-Day Research Roadmap
+Implement
+   ↓
+Unit Tests
+   ↓
+Integration Tests
+   ↓
+Full Regression
+   ↓
+Dashboard Verification
+   ↓
+Research Validation
+   ↓
+Git Commit
+   ↓
+Git Push
 
-The project is structured as an approximately **62–90 day research and development program**.
+Example:
 
-## Phase I — Security Foundation
+git status
 
-**Days 1–15**
+python -m pytest -q
 
-* Project architecture
-* Agent identity
-* Authorization
-* Policy enforcement
-* Risk scoring
-* Security testing
-* Audit logging
-* Security analytics
-* Behavioral rules
-* Initial monitoring dashboard
+git diff --check
 
-### Milestone
+git add <modified-files>
 
-**Deterministic Agent Security + Security Monitoring**
+git commit -m "Describe the change"
 
----
+git push
 
-## Phase II — Security Intelligence
+A change is not considered complete simply because the code executes once.
 
-**Days 16–30**
+🗺️ Development Roadmap
 
-* Advanced dashboard
-* Investigation workflows
-* Behavioral feature engineering
-* Agent profiling
-* Anomaly detection
-* Initial ML experiments
+The project follows an approximately 70-day research and engineering roadmap.
 
-### Milestone
+Phase I — Security Foundation
 
-**Behavior-Aware Agent Security**
+Days 1–12
 
----
+Project architecture
 
-## Phase III — Detection Research
+Agent identity
 
-**Days 31–45**
+Authorization
 
-* Dataset generation
-* Controlled attack scenarios
-* Behavioral baselines
-* Multiple anomaly-detection algorithms
-* Model comparison
-* False-positive analysis
-* Detection threshold experiments
+Policy enforcement
 
-### Milestone
+Risk assessment
 
-**Experimental Anomaly Detection Framework**
+Security infrastructure
 
----
+Audit foundation
 
-## Phase IV — Advanced Agent Security
+Milestone: Deterministic agent security foundation.
 
-**Days 46–60**
+Phase II — Security Analytics
 
-* Temporal behavior analysis
-* Sequence-based features
-* Agent trust modeling
-* Security event correlation
-* Explainable anomaly signals
-* Advanced attack simulations
+Days 13–20
 
-### Milestone
+Security analytics
 
-**Adaptive Agent Security Intelligence**
+Behavioral monitoring
 
----
+Suspicious-agent detection
 
-## Phase V — Research Evaluation
+Repeated-denial analysis
 
-**Days 61–75**
+Investigation foundations
 
-* Experimental design
-* Baseline comparison
-* Dataset preparation
-* Statistical evaluation
-* Performance benchmarking
-* Security effectiveness analysis
-* Ablation studies
+Security intelligence
 
-### Milestone
+Milestone: Behavioral security analytics.
 
-**Research-Validated Security Architecture**
+Phase III — Controlled Evaluation
 
----
+Days 21–27
 
-## Phase VI — Final Research & Publication
+Controlled security scenarios
 
-**Days 76–90**
+Experimental dataset generation
 
-* Final experiments
-* Results analysis
-* Architecture refinement
-* Threat-model documentation
-* Limitations
-* Research conclusions
-* Final dashboard
-* Technical documentation
-* Research paper preparation
-* Final demonstration
+Quantitative evaluation
 
-### Final Milestone
+Baseline comparison
 
-**Research-Level AegisGuard Prototype**
+Repeated multi-seed evaluation
 
----
+Milestone: Reproducible evaluation framework.
 
-# 📚 Research Deliverables
+Phase IV — Advanced Behavioral Intelligence
 
-The final project is intended to produce more than source code.
+Days 28–30
 
-Expected deliverables include:
+Statistical evaluation
 
-```text
-✓ Working security framework
-✓ Security monitoring dashboard
-✓ Automated security test suite
-✓ Behavioral feature pipeline
-✓ Anomaly detection experiments
-✓ Security dataset
+Multi-resolution behavioral analysis
+
+Cross-context correlation
+
+Adaptive response
+
+Integrated security dashboard
+
+Milestone: Adaptive behavioral security architecture.
+
+Phase V — Validation and Investigation
+
+Days 31–45
+
+Adaptive-response correctness
+
+Adaptive-response integration
+
+Explainable security decisions
+
+Configurable thresholds
+
+Controlled adversarial scenarios
+
+Ablation studies
+
+Threshold sensitivity
+
+Robustness evaluation
+
+Latency/performance evaluation
+
+Event schema hardening
+
+Audit evidence
+
+Security investigation
+
+Dashboard hardening
+
+Expanded testing
+
+Current area: Day 42 — Security Investigation.
+
+Phase VI — Advanced Security Engineering
+
+Days 46–60
+
+Planned areas include:
+
+False-positive analysis
+
+False-negative analysis
+
+Adaptive-response calibration
+
+Cross-context robustness
+
+Multi-agent behavior
+
+Agent-to-agent security
+
+MCP security boundaries
+
+Policy-engine integration
+
+Cloud-native service decomposition
+
+Event streaming
+
+Observability
+
+SIEM/SOC integration
+
+Containerization
+
+Kubernetes
+
+Cloud deployment
+
+Phase VII — Final Research Validation
+
+Days 61–70
+
+Planned areas include:
+
+Security hardening
+
+Failure-mode testing
+
+Resilience testing
+
+Scalability testing
+
+Full end-to-end evaluation
+
+Final ablation
+
+Statistical analysis
+
+Prior-art review
+
+Research evidence consolidation
+
+Architecture cleanup
+
+Final validation
+
+Research presentation
+
+🔬 Research Questions
+
+RQ1 — Authorization
+
+Can task- and context-aware authorization reduce unauthorized autonomous-agent actions compared with simpler permission checks?
+
+RQ2 — Behavioral Evidence
+
+Can historical behavior provide useful evidence for identifying suspicious agent activity?
+
+RQ3 — Multi-Resolution Analysis
+
+Does analyzing behavior across multiple resolutions reveal useful signals that are difficult to observe from individual actions alone?
+
+RQ4 — Cross-Context Correlation
+
+Can relationships between behavior across different contexts provide additional security evidence without producing unacceptable false positives?
+
+RQ5 — Adaptive Enforcement
+
+Can graduated response reduce unnecessary hard denials while increasing security scrutiny when evidence becomes elevated?
+
+RQ6 — Component Contribution
+
+Do behavioral, multi-resolution, cross-context, and adaptive-response components provide measurable benefit when compared individually and through ablation?
+
+RQ7 — Operational Feasibility
+
+Can the additional behavioral analysis be performed with acceptable latency, throughput, and resource overhead?
+
+⚠️ Threat Model
+
+Varynx considers controlled scenarios involving potentially compromised, misconfigured, or policy-violating agents.
+
+Relevant behaviors include:
+
+Unauthorized resource access
+
+Repeated policy violations
+
+Privilege expansion
+
+High-risk operations
+
+Behavioral drift
+
+Abnormal resource expansion
+
+Cross-context attack chains
+
+Suspicious multi-step activity
+
+The system does not assume that every anomalous action represents an attacker.
+
+Legitimate unusual behavior is an explicit part of evaluation.
+
+⚠️ Limitations
+
+Varynx is a research and engineering prototype, not a claim of a complete production-grade AI security gateway.
+
+Current limitations include:
+
+Synthetic datasets may not represent real-world attacks.
+
+Behavioral baselines may be incomplete.
+
+Detection quality depends on feature quality.
+
+Anomaly detection can generate false positives.
+
+Novel attack behavior may evade current controls.
+
+Cross-context correlations may produce spurious relationships.
+
+Risk scores do not establish malicious intent.
+
+Adaptive thresholds require empirical calibration.
+
+Performance overhead must be measured under realistic workloads.
+
+Cloud deployment and large-scale distributed operation require further validation.
+
+These limitations are part of the research agenda.
+
+🔍 Novelty and Prior-Art Position
+
+Varynx does not claim to be:
+
+The first AI-agent security platform
+
+The first behavioral security system
+
+Universally novel
+
+Unhackable
+
+100% secure
+
+Guaranteed patentable
+
+Automatically production-ready
+
+Existing security research and industry work already covers areas such as:
+
+Agent runtime protection
+
+Tool-use security
+
+Authorization
+
+Behavioral monitoring
+
+MCP security
+
+Runtime contracts
+
+Adaptive security
+
+Multi-agent security
+
+The intended contribution is therefore narrower and testable:
+
+Investigating whether a combined architecture of multi-resolution behavioral evidence, cross-context correlation, adaptive graduated enforcement, and reproducible evaluation can provide measurable advantages over simpler autonomous-agent security baselines.
+
+The final contribution must be established through implementation, controlled experiments, ablation, statistical analysis, robustness testing, and prior-art comparison.
+
+📚 Research Deliverables
+
+The final project is intended to produce:
+
+✓ Security control engine
+✓ Security event/audit architecture
+✓ Behavioral analysis pipeline
+✓ Controlled security scenarios
+✓ Reproducible experimental datasets
+✓ Quantitative evaluation framework
+✓ Baseline comparison
+✓ Repeated evaluation
+✓ Statistical evaluation
+✓ Multi-resolution analysis
+✓ Cross-context analysis
+✓ Adaptive response
+✓ Security investigation
+✓ Streamlit research dashboard
+✓ Automated test suite
+✓ Adversarial evaluation
+✓ Ablation studies
+✓ Robustness analysis
+✓ Performance evaluation
 ✓ Threat model
-✓ Experimental methodology
-✓ Benchmark results
-✓ Model comparison
-✓ False-positive analysis
-✓ Architecture documentation
-✓ Research report
-✓ Final technical demonstration
-```
+✓ Technical documentation
+✓ Final research report
 
----
+🔒 Security and Privacy
 
-# 🔒 Security & Privacy Considerations
-
-AegisGuard should follow secure development principles.
-
-Sensitive information should never be hardcoded into source code.
+Never commit secrets or sensitive runtime data.
 
 Do not commit:
 
-```text
 .env
-credentials
 API keys
+credentials
 private tokens
-database files
-local audit logs
+cloud secrets
 generated secrets
-```
+private audit logs
+sensitive datasets
 
-The project should use synthetic or controlled data during experimentation unless appropriate authorization exists for real-world data.
+Synthetic or controlled data should be preferred during research unless appropriate authorization exists for real-world data.
 
----
+📌 Current Project Status
 
-# ⚠️ Limitations
+Project: Varynx
 
-AegisGuard is a research prototype and should not currently be represented as a complete production-grade AI security gateway.
+Former name: AegisGuard
 
-Important limitations include:
+Product: Varynx Behavioral Risk Control Engine
 
-* ML anomaly detection can produce false positives.
-* Behavioral baselines may be incomplete.
-* Synthetic datasets may not represent real-world attacks.
-* Risk scores are not proof of malicious intent.
-* Detection performance depends on feature quality.
-* Novel attacks may evade existing rules and models.
-* Autonomous-agent behavior can be highly context dependent.
+Title: Cloud-Native Behavioral Risk Control for Autonomous AI Agents
 
-These limitations are part of the research problem rather than something to hide.
+Category: Cybersecurity / AI Security / Autonomous Agent Security
 
----
+Type: Research & Engineering Project
 
-# 🌐 Future Research Directions
+Current milestone: Day 42 — Security Investigation
 
-Potential extensions include:
+Implemented research/engineering areas
 
-* Real-time agent security enforcement
-* Agent-to-agent trust analysis
-* Temporal graph-based behavior modeling
-* Reinforcement-learning-based security adaptation
-* Explainable AI for security decisions
-* LLM-assisted security investigation
-* Threat intelligence integration
-* SIEM integration
-* Splunk integration
-* Cloud IAM integration
-* Kubernetes/container security
-* Multi-agent attack detection
-* Agent supply-chain security
-* Tool-use security
-* Prompt-injection-aware authorization
-* Privilege escalation detection
-* Continuous trust evaluation
+✓ Security foundation
+✓ Agent authorization
+✓ Risk assessment
+✓ Security analytics
+✓ Behavioral monitoring
+✓ Controlled security scenarios
+✓ Experimental dataset generation
+✓ Quantitative evaluation
+✓ Baseline comparison
+✓ Repeated evaluation
+✓ Statistical evaluation framework
+✓ Multi-resolution behavior
+✓ Cross-context correlation
+✓ Adaptive response
+✓ Event schema
+✓ Audit evidence
+✓ Investigation engine
 
----
+Current focus
 
-# 🧠 Research Contribution
+Security Investigation
+        ↓
+Dashboard Integration
+        ↓
+Validation
+        ↓
+Ablation
+        ↓
+Robustness
+        ↓
+Performance
+        ↓
+Cloud-Native Hardening
 
-The central research direction of AegisGuard is the combination of:
+Important: Implemented functionality is not automatically scientifically validated. Research claims will be based on actual experimental evidence.
 
-```text
-        STATIC SECURITY
-              │
-              ▼
-       Authorization
-              │
-              +
-        Risk Assessment
-              │
-              +
-        Audit Evidence
-              │
-              ▼
-      BEHAVIORAL SECURITY
-              │
-              ▼
-      Agent Profiling
-              │
-              +
-      Anomaly Detection
-              │
-              ▼
-       SECURITY INTELLIGENCE
-```
+👤 Author
 
-The project investigates whether autonomous-agent security can be strengthened by moving from:
-
-> **"Is this action permitted?"**
-
-toward:
-
-> **"Is this action permitted, appropriate for the current context, consistent with the agent's behavior, and supported by the available security evidence?"**
-
-That transition—from **static authorization to continuous, behavior-aware security intelligence**—is the core research motivation behind AegisGuard.
-
----
-
-# 📌 Project Status
-
-**Project:** AegisGuard
-
-**Category:** Cybersecurity / AI Security / Autonomous Agent Security
-
-**Type:** Research & Development Project
-
-**Planned Duration:** 62–90 Days
-
-**Current Development Stage:** Security Foundation → Behavioral Intelligence
-
-**Current Focus:**
-
-```text
-Authorization
-+
-Risk Assessment
-+
-Audit Logging
-+
-Behavioral Analytics
-+
-Anomaly Detection
-+
-Security Monitoring
-```
-
----
-
-# 👤 Author
-
-**Catherina Jercy**
+Catherina Jercy
 
 Cyber Security Engineering
 
 GitHub:
-`https://github.com/catherinajercy2007`
+https://github.com/catherinajercy2007
 
----
+📄 Research Disclaimer
 
-# 📜 Disclaimer
+Varynx is an educational and research-oriented cybersecurity project developed for security engineering, controlled experimentation, and academic research.
 
-AegisGuard is an educational and research-oriented cybersecurity project developed for experimentation, security engineering, and academic research.
+It should not be considered a complete production security solution without:
 
-The framework should not be considered a complete production security solution without additional security review, threat modeling, validation, performance testing, and deployment hardening.
+Independent security review
 
----
+Threat-model validation
 
-## ⭐ If You Find This Project Interesting
+Adversarial testing
 
-AegisGuard is being developed as a long-term research project exploring the intersection of:
+Performance benchmarking
 
-**Cybersecurity × AI Agents × Authorization × Behavioral Analytics × Anomaly Detection × Security Engineering**
+Operational monitoring
 
-Contributions, research discussions, technical feedback, and collaboration are welcome.
+Deployment hardening
+
+Appropriate access-control review
+
+No security system can guarantee complete protection against all attacks.
+
+⭐ Project Vision
+
+Varynx explores the transition from:
+
+"Is this action permitted?"
+
+toward:
+
+"Is this action permitted,
+appropriate for the current context,
+consistent with observed behavior,
+and supported by the available security evidence?"
+
+The long-term goal is to investigate whether continuous behavioral security intelligence can become a useful additional control layer for autonomous AI agents without replacing deterministic authorization or creating unacceptable operational overhead.
+
+🔗 Repository
+
+GitHub repository:
+
+https://github.com/catherinajercy2007/AegisGuard-repository
+
+Varynx
+
+Cybersecurity × AI Agents × Behavioral Intelligence × Adaptive Security × Research Engineering

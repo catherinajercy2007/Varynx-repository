@@ -1,5 +1,5 @@
 """
-AegisGuard Day 30
+Varynx Day 30
 Adaptive Security Response Engine
 
 Purpose
@@ -23,9 +23,10 @@ a production security policy without further validation.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 
 class ResponseAction(str, Enum):
@@ -106,6 +107,29 @@ def _normalise_score(
     return _clamp(score)
 
 
+def _validate_evidence(
+    evidence: Any,
+) -> Mapping[str, Any]:
+    """
+    Validate the runtime evidence contract.
+
+    Type annotations are not runtime validation. Explicitly checking
+    the input prevents malformed evidence such as None, lists,
+    strings, integers, or arbitrary objects from reaching .get()
+    and producing an accidental AttributeError.
+
+    A Mapping is accepted rather than requiring dict specifically,
+    which keeps the API compatible with read-only/custom mappings.
+    """
+
+    if not isinstance(evidence, Mapping):
+        raise TypeError(
+            "evidence must be a mapping"
+        )
+
+    return evidence
+
+
 def calculate_adaptive_risk_score(
     evidence: Mapping[str, Any],
 ) -> float:
@@ -129,6 +153,10 @@ def calculate_adaptive_risk_score(
     Missing evidence contributes zero rather than inventing
     evidence.
     """
+
+    evidence = _validate_evidence(
+        evidence
+    )
 
     risk = _normalise_score(
         evidence.get(
@@ -229,6 +257,10 @@ def generate_response_reasons(
     """
     Produce human-readable explanations for the decision.
     """
+
+    evidence = _validate_evidence(
+        evidence
+    )
 
     reasons: List[str] = []
 
@@ -392,19 +424,25 @@ def determine_response_action(
     single score would otherwise hide a severe signal.
     """
 
-    evidence = evidence or {}
+    if evidence is None:
+        validated_evidence: Mapping[str, Any] = {}
+
+    else:
+        validated_evidence = _validate_evidence(
+            evidence
+        )
 
     risk = _normalise_score(
-        evidence.get(
+        validated_evidence.get(
             "risk_score",
             0,
         )
     )
 
     anomaly = _normalise_score(
-        evidence.get(
+        validated_evidence.get(
             "anomaly_score",
-            evidence.get(
+            validated_evidence.get(
                 "behavioral_anomaly_score",
                 0,
             ),
@@ -412,9 +450,9 @@ def determine_response_action(
     )
 
     denial = _normalise_score(
-        evidence.get(
+        validated_evidence.get(
             "repeated_denial_score",
-            evidence.get(
+            validated_evidence.get(
                 "denial_score",
                 0,
             ),
@@ -422,9 +460,9 @@ def determine_response_action(
     )
 
     cross_context = _normalise_score(
-        evidence.get(
+        validated_evidence.get(
             "cross_context_score",
-            evidence.get(
+            validated_evidence.get(
                 "correlation_score",
                 0,
             ),
@@ -473,7 +511,15 @@ def calculate_adaptive_response(
     Main public API.
 
     Returns a fully explainable response object.
+
+    Evidence must be a mapping. Invalid runtime inputs are rejected
+    explicitly rather than producing accidental AttributeError
+    exceptions from internal .get() calls.
     """
+
+    evidence = _validate_evidence(
+        evidence
+    )
 
     score = calculate_adaptive_risk_score(
         evidence
@@ -527,7 +573,9 @@ def evaluate_events(
     results: List[Dict[str, Any]] = []
 
     for index, event in enumerate(events):
-        evidence = dict(event)
+        evidence = dict(
+            _validate_evidence(event)
+        )
 
         response = calculate_adaptive_response(
             evidence

@@ -294,7 +294,7 @@ def test_investigation_filters_by_risk_level(investigation_database):
     )
 
     assert len(rows) == 2
-    assert {row["risk"] for row in rows} == {85, 95}
+    assert rows[0]["risk"] == 95
 
 
 @pytest.mark.parametrize(

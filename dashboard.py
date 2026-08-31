@@ -6,14 +6,17 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
+import logging
+import traceback
+import time
 
 import pandas as pd
 import streamlit as st
 
 
 # ============================================================
-# AEGISGUARD
-# UNIFIED DAY 1–30 SECURITY + RESEARCH DASHBOARD
+# VARYNX
+# UNIFIED SECURITY + RESEARCH DASHBOARD
 # ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -27,7 +30,7 @@ EXPECTED_ENV = Path(r"D:\aegisguard-env").resolve()
 # ============================================================
 
 st.set_page_config(
-    page_title="AegisGuard Intelligence SOC",
+    page_title="Varynx Behavioral Risk Control Engine",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -155,6 +158,89 @@ def extract_scalar_rows(
             )
 
     return rows
+
+
+# ============================================================
+# DAY 43 — DASHBOARD HARDENING
+# ============================================================
+
+LOGGER = logging.getLogger("varynx.dashboard")
+if not LOGGER.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
+
+
+def record_dashboard_error(component: str, exc: Exception) -> None:
+    """Record a dashboard error without exposing a traceback to users."""
+    LOGGER.error(
+        "Dashboard component failed: %s | %s",
+        component,
+        exc,
+        exc_info=True,
+    )
+    errors = st.session_state.setdefault("dashboard_errors", [])
+    errors.append(
+        {
+            "time": datetime.now().isoformat(timespec="seconds"),
+            "component": component,
+            "error": str(exc),
+        }
+    )
+    # Keep session diagnostics bounded.
+    del errors[:-25]
+
+
+def safe_import(component: str, loader: Callable[[], Any]) -> Any:
+    """Import a component defensively and return None on failure."""
+    try:
+        return loader()
+    except Exception as exc:
+        record_dashboard_error(component, exc)
+        return None
+
+
+def normalize_dataframe_columns(dataframe: pd.DataFrame) -> pd.DataFrame:
+    """Normalize dashboard data without mutating caller-owned frames."""
+    if dataframe.empty:
+        return dataframe.copy()
+    result = dataframe.copy()
+    result.columns = [str(column).strip() for column in result.columns]
+    return result
+
+
+def render_error_panel(component: str, error: str | None) -> None:
+    """Render a concise user-facing module failure message."""
+    if error:
+        st.error(
+            f"{component} is unavailable. The rest of the dashboard can continue. "
+            "Check System Status for diagnostics."
+        )
+
+
+def render_dashboard_health(modules: dict[str, Any]) -> None:
+    """Show compact runtime health information for Day 43."""
+    module_names = [
+        "analytics", "behavior", "scenarios", "investigation",
+        "dataset", "evaluation", "comparison", "repeated",
+        "statistical", "multiresolution", "cross_context",
+        "adaptive_response",
+    ]
+    available = sum(1 for name in module_names if name in modules)
+    total = len(module_names)
+    error_count = len(st.session_state.get("dashboard_errors", []))
+    status = "HEALTHY" if available == total and error_count == 0 else "DEGRADED"
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Modules", f"{available}/{total}")
+    c2.metric("Dashboard Errors", error_count)
+    c3.metric("Runtime Status", status)
+
+
+def clear_dashboard_diagnostics() -> None:
+    """Clear only dashboard diagnostic state; preserve research state."""
+    st.session_state["dashboard_errors"] = []
 
 
 # ============================================================
@@ -410,7 +496,10 @@ def load_modules() -> dict[str, Any]:
     return modules
 
 
-MODULES = load_modules()
+if "dashboard_modules" not in st.session_state:
+    st.session_state["dashboard_modules"] = load_modules()
+
+MODULES = st.session_state["dashboard_modules"]
 
 
 # ============================================================
@@ -418,6 +507,8 @@ MODULES = load_modules()
 # ============================================================
 
 DEFAULT_STATE = {
+    "dashboard_errors": [],
+    "dashboard_modules": None,
     "selected_agent":
         None,
 
@@ -676,6 +767,28 @@ NAVIGATION = [
     "⚙️ System Status",
 ]
 
+
+# ============================================================
+# DAY 43 — NAVIGATION + HEALTH CONTROLS
+# ============================================================
+
+with st.sidebar.expander("⚙️ Dashboard Controls", expanded=False):
+    st.caption("Day 43 hardened runtime controls")
+    if st.button("🔄 Reload Modules", use_container_width=True, key="reload_modules"):
+        st.session_state["dashboard_modules"] = load_modules()
+        st.session_state["dashboard_errors"] = []
+        st.rerun()
+
+    if st.button("🧹 Clear Diagnostics", use_container_width=True, key="clear_diagnostics"):
+        clear_dashboard_diagnostics()
+        st.rerun()
+
+    st.caption(
+        f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    )
+
+with st.sidebar.expander("🩺 Runtime Health", expanded=False):
+    render_dashboard_health(MODULES)
 
 dashboard_view = st.sidebar.radio(
     "Navigation",
@@ -4554,6 +4667,26 @@ elif dashboard_view == "⚙️ System Status":
 
 
 # ============================================================
+# DAY 43 — DIAGNOSTICS
+# ============================================================
+
+if st.session_state.get("dashboard_errors"):
+    with st.expander("⚠️ Dashboard Diagnostics", expanded=False):
+        diagnostics = pd.DataFrame(
+            st.session_state["dashboard_errors"]
+        )
+        if not diagnostics.empty:
+            st.dataframe(
+                diagnostics,
+                width="stretch",
+                hide_index=True,
+            )
+            st.caption(
+                "Diagnostics are local session records. Sensitive exception details "
+                "are kept out of normal dashboard panels."
+            )
+
+# ============================================================
 # FOOTER
 # ============================================================
 
@@ -4562,10 +4695,10 @@ st.divider()
 st.markdown(
     """
     <div class="footer">
-        🛡️ <strong>AegisGuard</strong>
+        🛡️ <strong>Varynx</strong>
         • Behavior-Aware Security for Autonomous AI Agents
         <br>
-        Day 1–30 Unified Research Dashboard
+        Unified Research & Security Dashboard
         • Controlled Evaluation
         • Reproducible Experiments
         • Statistical Validation

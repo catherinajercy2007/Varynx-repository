@@ -292,10 +292,9 @@ def test_investigation_filters_by_risk_level(investigation_database):
     rows = investigation_database.get_investigation_events(
         risk_level="critical"
     )
-
     assert len(rows) == 2
-    assert rows[0]["risk"] == 95
-
+    assert {row["risk"] for row in rows} == {85, 95}
+    
 
 @pytest.mark.parametrize(
     "kwargs",

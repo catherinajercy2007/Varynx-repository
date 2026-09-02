@@ -3,6 +3,7 @@ Varynx Day 44 - Edge Case and Integration Test Expansion
 
 This test module intentionally builds on the existing public APIs rather
 than replacing earlier tests. It targets:
+
 - core module importability
 - adaptive-response boundary behavior
 - adaptive-response malformed evidence
@@ -24,8 +25,19 @@ from pathlib import Path
 import pytest
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# ============================================================
+# PROJECT PATH
+# ============================================================
 
+# tests/test_day44_edge_cases.py
+#        parents[0] -> tests/
+#        parents[1] -> repository root/
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+# ============================================================
+# CORE MODULE CONTRACT
+# ============================================================
 
 CORE_MODULES = [
     "app.analytics",
@@ -44,6 +56,10 @@ CORE_MODULES = [
 ]
 
 
+# ============================================================
+# CORE IMPORT TEST
+# ============================================================
+
 def test_core_security_modules_are_importable():
     """All major Day 1-43 modules must remain importable."""
     failures = []
@@ -52,26 +68,66 @@ def test_core_security_modules_are_importable():
         try:
             importlib.import_module(module_name)
         except Exception as exc:
-            failures.append(f"{module_name}: {type(exc).__name__}: {exc}")
+            failures.append(
+                f"{module_name}: {type(exc).__name__}: {exc}"
+            )
 
-    assert not failures, "Core module import failures:\n" + "\n".join(failures)
+    assert not failures, (
+        "Core module import failures:\n"
+        + "\n".join(failures)
+    )
 
+
+# ============================================================
+# DAY 30 — ADAPTIVE RESPONSE
+# ============================================================
 
 def test_adaptive_response_boundary_values():
     """Boundary inputs must produce a valid graduated response."""
-    adaptive = importlib.import_module("app.adaptive_response")
+    adaptive = importlib.import_module(
+        "app.adaptive_response"
+    )
 
-    calculate = getattr(adaptive, "calculate_adaptive_response", None)
-    response_action = getattr(adaptive, "ResponseAction", None)
+    calculate = getattr(
+        adaptive,
+        "calculate_adaptive_response",
+        None,
+    )
+
+    response_action = getattr(
+        adaptive,
+        "ResponseAction",
+        None,
+    )
 
     assert callable(calculate), (
-        "calculate_adaptive_response is required by the Day 30 contract"
+        "calculate_adaptive_response is required "
+        "by the Day 30 contract"
     )
-    assert response_action is not None, "ResponseAction enum is required"
 
-    valid_actions = {member.value for member in response_action}
+    assert response_action is not None, (
+        "ResponseAction enum is required"
+    )
 
-    for score in (0, 1, 20, 21, 44, 45, 50, 51, 79, 80, 99, 100):
+    valid_actions = {
+        member.value
+        for member in response_action
+    }
+
+    for score in (
+        0,
+        1,
+        20,
+        21,
+        44,
+        45,
+        50,
+        51,
+        79,
+        80,
+        99,
+        100,
+    ):
         result = calculate(
             {
                 "risk_score": score,
@@ -80,33 +136,71 @@ def test_adaptive_response_boundary_values():
         )
 
         assert isinstance(result, dict)
+
         assert result.get("action") in valid_actions
 
+
+# ============================================================
+# ADAPTIVE RESPONSE EXPLAINABILITY
+# ============================================================
 
 @pytest.mark.parametrize(
     "evidence",
     [
-        {"risk_score": 0, "anomaly_score": 0},
-        {"risk_score": 100, "anomaly_score": 100},
-        {"risk_score": 45, "anomaly_score": 20},
-        {"risk_score": 80, "anomaly_score": 0},
-        {"risk_score": 0, "anomaly_score": 100},
+        {
+            "risk_score": 0,
+            "anomaly_score": 0,
+        },
+        {
+            "risk_score": 100,
+            "anomaly_score": 100,
+        },
+        {
+            "risk_score": 45,
+            "anomaly_score": 20,
+        },
+        {
+            "risk_score": 80,
+            "anomaly_score": 0,
+        },
+        {
+            "risk_score": 0,
+            "anomaly_score": 100,
+        },
     ],
 )
-def test_adaptive_response_output_is_explainable(evidence):
-    """Adaptive responses must expose an action and score-like evidence."""
-    adaptive = importlib.import_module("app.adaptive_response")
+def test_adaptive_response_output_is_explainable(
+    evidence,
+):
+    """
+    Adaptive responses must expose an action and
+    score-like evidence.
+    """
+    adaptive = importlib.import_module(
+        "app.adaptive_response"
+    )
+
     calculate = adaptive.calculate_adaptive_response
 
     result = calculate(evidence)
 
     assert isinstance(result, dict)
+
     assert result.get("action")
+
     assert any(
         key in result
-        for key in ("score", "adaptive_score", "risk_score")
+        for key in (
+            "score",
+            "adaptive_score",
+            "risk_score",
+        )
     )
 
+
+# ============================================================
+# ADAPTIVE RESPONSE MALFORMED INPUT
+# ============================================================
 
 @pytest.mark.parametrize(
     "bad_evidence",
@@ -118,23 +212,41 @@ def test_adaptive_response_output_is_explainable(evidence):
         object(),
     ],
 )
-def test_adaptive_response_rejects_non_mapping_evidence(bad_evidence):
-    """Malformed evidence must not silently become a valid decision."""
-    adaptive = importlib.import_module("app.adaptive_response")
+def test_adaptive_response_rejects_non_mapping_evidence(
+    bad_evidence,
+):
+    """
+    Malformed evidence must not silently become
+    a valid security decision.
+    """
+    adaptive = importlib.import_module(
+        "app.adaptive_response"
+    )
+
     calculate = adaptive.calculate_adaptive_response
 
-    with pytest.raises((TypeError, ValueError)):
+    with pytest.raises(
+        (TypeError, ValueError)
+    ):
         calculate(bad_evidence)
 
 
+# ============================================================
+# ADAPTIVE RESPONSE EXTREME NUMERIC VALUES
+# ============================================================
+
 def test_adaptive_response_clamps_or_rejects_extreme_numeric_values():
     """
-    Extreme values must never produce an out-of-range adaptive score.
+    Extreme values must never produce an out-of-range
+    adaptive score.
 
-    If the implementation rejects the values, that is acceptable and is
-    explicitly treated as safe behavior.
+    If the implementation rejects the values, that is
+    acceptable and is explicitly treated as safe behavior.
     """
-    adaptive = importlib.import_module("app.adaptive_response")
+    adaptive = importlib.import_module(
+        "app.adaptive_response"
+    )
+
     calculate = adaptive.calculate_adaptive_response
 
     try:
@@ -144,7 +256,12 @@ def test_adaptive_response_clamps_or_rejects_extreme_numeric_values():
                 "anomaly_score": -10_000,
             }
         )
-    except (TypeError, ValueError, OverflowError):
+
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+    ):
         return
 
     assert isinstance(result, dict)
@@ -153,20 +270,41 @@ def test_adaptive_response_clamps_or_rejects_extreme_numeric_values():
         "score",
         result.get(
             "adaptive_score",
-            result.get("risk_score"),
+            result.get(
+                "risk_score"
+            ),
         ),
     )
 
-    if isinstance(score, (int, float)):
+    if isinstance(
+        score,
+        (int, float),
+    ):
         assert 0 <= float(score) <= 100
 
 
-@pytest.fixture()
-def investigation_database(tmp_path, monkeypatch):
-    """Create an isolated SQLite audit database for investigation tests."""
-    database_path = tmp_path / "day44_investigation.db"
+# ============================================================
+# INVESTIGATION DATABASE FIXTURE
+# ============================================================
 
-    connection = sqlite3.connect(database_path)
+@pytest.fixture()
+def investigation_database(
+    tmp_path,
+    monkeypatch,
+):
+    """
+    Create an isolated SQLite audit database
+    for investigation tests.
+    """
+    database_path = (
+        tmp_path
+        / "day44_investigation.db"
+    )
+
+    connection = sqlite3.connect(
+        database_path
+    )
+
     connection.execute(
         """
         CREATE TABLE audit_events (
@@ -242,14 +380,21 @@ def investigation_database(tmp_path, monkeypatch):
         """,
         events,
     )
+
     connection.commit()
     connection.close()
 
-    investigation = importlib.import_module("app.investigation")
+    investigation = importlib.import_module(
+        "app.investigation"
+    )
 
-    if not hasattr(investigation, "DATABASE_PATH"):
+    if not hasattr(
+        investigation,
+        "DATABASE_PATH",
+    ):
         pytest.fail(
-            "app.investigation must expose DATABASE_PATH so tests can "
+            "app.investigation must expose "
+            "DATABASE_PATH so tests can "
             "isolate database access"
         )
 
@@ -262,53 +407,147 @@ def investigation_database(tmp_path, monkeypatch):
     return investigation
 
 
-def test_investigation_empty_filter_returns_events(investigation_database):
-    """An unfiltered investigation query should return available events."""
-    rows = investigation_database.get_investigation_events()
+# ============================================================
+# INVESTIGATION — BASIC QUERY
+# ============================================================
 
-    assert isinstance(rows, list)
+def test_investigation_empty_filter_returns_events(
+    investigation_database,
+):
+    """
+    An unfiltered investigation query should
+    return available events.
+    """
+    rows = (
+        investigation_database
+        .get_investigation_events()
+    )
+
+    assert isinstance(
+        rows,
+        list,
+    )
+
     assert len(rows) == 4
 
 
-def test_investigation_filters_by_agent(investigation_database):
-    rows = investigation_database.get_investigation_events(
-        agent_id="agent-alpha"
+# ============================================================
+# INVESTIGATION — AGENT FILTER
+# ============================================================
+
+def test_investigation_filters_by_agent(
+    investigation_database,
+):
+    rows = (
+        investigation_database
+        .get_investigation_events(
+            agent_id="agent-alpha"
+        )
     )
 
     assert len(rows) == 2
-    assert {row["agent_id"] for row in rows} == {"agent-alpha"}
+
+    assert {
+        row["agent_id"]
+        for row in rows
+    } == {
+        "agent-alpha"
+    }
 
 
-def test_investigation_filters_by_decision(investigation_database):
-    rows = investigation_database.get_investigation_events(
-        decision="deny"
+# ============================================================
+# INVESTIGATION — DECISION FILTER
+# ============================================================
+
+def test_investigation_filters_by_decision(
+    investigation_database,
+):
+    rows = (
+        investigation_database
+        .get_investigation_events(
+            decision="deny"
+        )
     )
 
     assert len(rows) == 2
-    assert {row["decision"] for row in rows} == {"DENY"}
+
+    assert {
+        row["decision"]
+        for row in rows
+    } == {
+        "DENY"
+    }
 
 
-def test_investigation_filters_by_risk_level(investigation_database):
-    rows = investigation_database.get_investigation_events(
-        risk_level="critical"
+# ============================================================
+# INVESTIGATION — RISK LEVEL FILTER
+# ============================================================
+
+def test_investigation_filters_by_risk_level(
+    investigation_database,
+):
+    """
+    CRITICAL is defined as risk >= 80.
+
+    The fixture intentionally contains two critical
+    events: risk 85 and risk 95.
+    """
+    rows = (
+        investigation_database
+        .get_investigation_events(
+            risk_level="critical"
+        )
     )
+
     assert len(rows) == 2
-    assert {row["risk"] for row in rows} == {85, 95}
-    
+
+    assert {
+        row["risk"]
+        for row in rows
+    } == {
+        85,
+        95,
+    }
+
+
+# ============================================================
+# INVESTIGATION — INVALID FILTERS
+# ============================================================
 
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"limit": 0},
-        {"limit": -1},
-        {"limit": 5001},
-        {"minimum_risk": -1},
-        {"minimum_risk": 101},
-        {"maximum_risk": -1},
-        {"maximum_risk": 101},
-        {"minimum_risk": 90, "maximum_risk": 10},
-        {"decision": "UNKNOWN"},
-        {"risk_level": "UNKNOWN"},
+        {
+            "limit": 0
+        },
+        {
+            "limit": -1
+        },
+        {
+            "limit": 5001
+        },
+        {
+            "minimum_risk": -1
+        },
+        {
+            "minimum_risk": 101
+        },
+        {
+            "maximum_risk": -1
+        },
+        {
+            "maximum_risk": 101
+        },
+        {
+            "minimum_risk": 90,
+            "maximum_risk": 10,
+        },
+        {
+            "decision": "UNKNOWN"
+        },
+        {
+            "risk_level": "UNKNOWN"
+        },
     ],
 )
 def test_investigation_rejects_invalid_filters(
@@ -316,54 +555,126 @@ def test_investigation_rejects_invalid_filters(
     kwargs,
 ):
     with pytest.raises(ValueError):
-        investigation_database.get_investigation_events(**kwargs)
+        investigation_database.get_investigation_events(
+            **kwargs
+        )
 
 
-def test_investigation_event_lookup_handles_missing_id(investigation_database):
-    result = investigation_database.get_investigation_event(999999)
+# ============================================================
+# INVESTIGATION — MISSING EVENT
+# ============================================================
+
+def test_investigation_event_lookup_handles_missing_id(
+    investigation_database,
+):
+    result = (
+        investigation_database
+        .get_investigation_event(
+            999999
+        )
+    )
 
     assert result is None
 
 
-def test_investigation_event_lookup_rejects_invalid_id(investigation_database):
+# ============================================================
+# INVESTIGATION — INVALID EVENT ID
+# ============================================================
+
+def test_investigation_event_lookup_rejects_invalid_id(
+    investigation_database,
+):
     with pytest.raises(ValueError):
-        investigation_database.get_investigation_event(0)
+        investigation_database.get_investigation_event(
+            0
+        )
 
 
-def test_investigation_filter_options_are_structured(investigation_database):
-    options = investigation_database.get_investigation_filter_options()
+# ============================================================
+# INVESTIGATION — FILTER OPTIONS
+# ============================================================
 
-    assert isinstance(options, dict)
+def test_investigation_filter_options_are_structured(
+    investigation_database,
+):
+    options = (
+        investigation_database
+        .get_investigation_filter_options()
+    )
 
-    for key in ("agents", "tasks", "actions", "resources"):
+    assert isinstance(
+        options,
+        dict,
+    )
+
+    for key in (
+        "agents",
+        "tasks",
+        "actions",
+        "resources",
+    ):
         assert key in options
-        assert isinstance(options[key], list)
 
+        assert isinstance(
+            options[key],
+            list,
+        )
+
+
+# ============================================================
+# DAY 43 — DASHBOARD SOURCE VALIDATION
+# ============================================================
 
 def test_dashboard_source_is_valid_python():
     """
     Parse dashboard.py without importing Streamlit.
 
-    This catches accidental pasted text, misplaced future imports and
-    other syntax corruption without triggering UI execution.
+    This catches accidental pasted text,
+    misplaced future imports and other syntax
+    corruption without triggering UI execution.
     """
-    dashboard = PROJECT_ROOT / "dashboard.py"
+    dashboard = (
+        PROJECT_ROOT
+        / "dashboard.py"
+    )
 
-    if not dashboard.exists():
-        pytest.skip("dashboard.py is not present in the checked-out workspace")
+    assert dashboard.exists(), (
+        "dashboard.py is missing from "
+        f"repository root: {dashboard}"
+    )
 
-    source = dashboard.read_text(encoding="utf-8")
-    ast.parse(source, filename=str(dashboard))
+    source = dashboard.read_text(
+        encoding="utf-8"
+    )
 
+    ast.parse(
+        source,
+        filename=str(dashboard),
+    )
+
+
+# ============================================================
+# DAY 43 — DASHBOARD HARDENING CONTRACT
+# ============================================================
 
 def test_dashboard_contains_day43_hardening_contract():
-    """Day 43 dashboard hardening helpers should remain present."""
-    dashboard = PROJECT_ROOT / "dashboard.py"
+    """
+    Day 43 dashboard hardening helpers should
+    remain present.
+    """
+    dashboard = (
+        PROJECT_ROOT
+        / "dashboard.py"
+    )
 
-    if not dashboard.exists():
-        pytest.skip("dashboard.py is not present in the checked-out workspace")
+    assert dashboard.exists(), (
+        "dashboard.py is missing from "
+        f"repository root: {dashboard}"
+    )
 
-    source = dashboard.read_text(encoding="utf-8")
+    source = dashboard.read_text(
+        encoding="utf-8"
+    )
 
     required_markers = [
         "record_dashboard_error",
@@ -374,42 +685,76 @@ def test_dashboard_contains_day43_hardening_contract():
         "Clear Diagnostics",
     ]
 
-    missing = [marker for marker in required_markers if marker not in source]
+    missing = [
+        marker
+        for marker in required_markers
+        if marker not in source
+    ]
 
     assert not missing, (
-        "Day 43 dashboard hardening contract is incomplete. "
+        "Day 43 dashboard hardening "
+        "contract is incomplete. "
         f"Missing markers: {missing}"
     )
 
 
+# ============================================================
+# DAY 40 — EVENT SCHEMA IMPORT
+# ============================================================
+
 def test_event_schema_module_imports_without_circular_dependency():
-    """Day 40 event schema must remain independently importable."""
-    module = importlib.import_module("app.event_schema")
+    """
+    Day 40 event schema must remain independently
+    importable.
+    """
+    module = importlib.import_module(
+        "app.event_schema"
+    )
+
     assert module is not None
 
 
+# ============================================================
+# DAY 40 — EVENT SCHEMA VALIDATION SURFACE
+# ============================================================
+
 def test_event_schema_has_public_validation_surface():
     """
-    Verify that the event schema module exposes at least one public
-    callable related to validation/schema handling.
+    Verify that the event schema module exposes
+    at least one public callable related to
+    validation/schema handling.
 
-    This deliberately avoids inventing a function name because the
-    project's actual event-schema API may evolve.
+    This deliberately avoids inventing a function
+    name because the project's actual event-schema
+    API may evolve.
     """
-    module = importlib.import_module("app.event_schema")
+    module = importlib.import_module(
+        "app.event_schema"
+    )
 
     public_callables = [
         name
         for name in dir(module)
         if not name.startswith("_")
-        and callable(getattr(module, name))
+        and callable(
+            getattr(
+                module,
+                name,
+            )
+        )
         and any(
             token in name.lower()
-            for token in ("valid", "schema", "event", "normal")
+            for token in (
+                "valid",
+                "schema",
+                "event",
+                "normal",
+            )
         )
     ]
 
     assert public_callables, (
-        "event_schema.py does not expose a recognizable public "
-        "validation/schema callable"
+        "event_schema.py does not expose "
+        "a recognizable public validation/"
+        "schema callable"
     )

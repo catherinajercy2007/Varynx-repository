@@ -1,0 +1,86 @@
+[
+  {
+    "case_id": "case-001",
+    "scenario_id": "agent-a-cf-001",
+    "base_consequence_score": 20,
+    "context": {
+      "resource_sensitivity": 20,
+      "privilege_context": 10,
+      "scope_context": 10,
+      "environment_context": 20,
+      "persistence_context": 10
+    },
+    "expected_min": 0,
+    "expected_max": 100
+  },
+  {
+    "case_id": "case-002",
+    "scenario_id": "agent-a-cf-002",
+    "base_consequence_score": 40,
+    "context": {
+      "resource_sensitivity": 50,
+      "privilege_context": 40,
+      "scope_context": 30,
+      "environment_context": 50,
+      "persistence_context": 40
+    },
+    "expected_min": 0,
+    "expected_max": 100
+  },
+  {
+    "case_id": "case-003",
+    "scenario_id": "agent-b-cf-001",
+    "base_consequence_score": 60,
+    "context": {
+      "resource_sensitivity": 80,
+      "privilege_context": 70,
+      "scope_context": 60,
+      "environment_context": 80,
+      "persistence_context": 70
+    },
+    "expected_min": 0,
+    "expected_max": 100
+  },
+  {
+    "case_id": "case-004",
+    "scenario_id": "agent-b-cf-002",
+    "base_consequence_score": 75,
+    "context": {
+      "resource_sensitivity": 90,
+      "privilege_context": 90,
+      "scope_context": 80,
+      "environment_context": 90,
+      "persistence_context": 85
+    },
+    "expected_min": 0,
+    "expected_max": 100
+  },
+  {
+    "case_id": "case-005",
+    "scenario_id": "agent-c-cf-001",
+    "base_consequence_score": 90,
+    "context": {
+      "resource_sensitivity": 100,
+      "privilege_context": 100,
+      "scope_context": 100,
+      "environment_context": 100,
+      "persistence_context": 100
+    },
+    "expected_min": 0,
+    "expected_max": 100
+  },
+  {
+    "case_id": "case-006",
+    "scenario_id": "agent-c-cf-002",
+    "base_consequence_score": 50,
+    "context": {
+      "resource_sensitivity": 0,
+      "privilege_context": 0,
+      "scope_context": 0,
+      "environment_context": 0,
+      "persistence_context": 0
+    },
+    "expected_min": 0,
+    "expected_max": 100
+  }
+]

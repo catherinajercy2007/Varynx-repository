@@ -7,7 +7,7 @@ services:
     container_name: varynx-platform
 
     ports:
-      - "8000:8000"
+      - "8001:8000"
 
     environment:
       VARYNX_SERVICE_NAME: varynx-platform
@@ -17,6 +17,9 @@ services:
       VARYNX_LOG_LEVEL: INFO
       VARYNX_METRICS_ENABLED: "true"
       VARYNX_DATABASE_PATH: /app/aegisguard.db
+
+    volumes:
+      - ../aegisguard.db:/app/aegisguard.db
 
     restart: unless-stopped
 

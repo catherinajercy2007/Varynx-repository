@@ -17,6 +17,12 @@ class RuntimeExecutionService:
         decision: str,
         tool: Callable[[Any], Any],
         request: Any,
+        agent_id: str | None = None,
+        task_id: str | None = None,
+        action: str | None = None,
+        resource: str | None = None,
+        risk: int = 0,
+        reason: str = "",
     ) -> Any:
 
         if decision == "DENY":
@@ -28,4 +34,10 @@ class RuntimeExecutionService:
             decision=enforcement_decision,
             tool=tool,
             request=request,
+            agent_id=agent_id,
+            task_id=task_id,
+            action=action,
+            resource=resource,
+            risk=risk,
+            reason=reason,
         )

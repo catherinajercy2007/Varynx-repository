@@ -1,6 +1,7 @@
 from typing import Any, Callable
 
 from app.adaptive_response import ResponseAction
+from app.audit import log_authorization_event
 
 
 class RuntimeEnforcementError(Exception):
@@ -23,23 +24,52 @@ class RuntimeSecurityGateway:
         decision: str | ResponseAction,
         tool: Callable[[Any], Any],
         request: Any,
+        agent_id: str | None = None,
+        task_id: str | None = None,
+        action: str | None = None,
+        resource: str | None = None,
+        risk: int = 0,
+        reason: str = "",
     ) -> Any:
 
-        # Convert Enum to string
         if isinstance(decision, ResponseAction):
             decision = decision.value
 
-        # BLOCK
         if decision == ResponseAction.BLOCK.value:
+            if all(
+                value is not None
+                for value in (
+                    agent_id,
+                    task_id,
+                    action,
+                    resource,
+                )
+            ):
+                log_authorization_event(
+                    agent_id=agent_id,
+                    task_id=task_id,
+                    action=action,
+                    resource=resource,
+                    decision="BLOCK",
+                    risk=risk,
+                    reason=reason or "Runtime security blocked execution",
+                )
+
+            self.security_events.append(
+                {
+                    "decision": decision,
+                    "request": request,
+                    "action": "execution_blocked",
+                }
+            )
+
             raise RuntimeEnforcementError(
                 "Action blocked by runtime security policy"
             )
 
-        # ALLOW
         if decision == ResponseAction.ALLOW.value:
             return tool(request)
 
-        # ALLOW WITH MONITORING
         if decision == ResponseAction.ALLOW_WITH_MONITORING.value:
             event = {
                 "decision": decision,
@@ -56,25 +86,21 @@ class RuntimeSecurityGateway:
 
             return tool(request)
 
-        # STEP UP VERIFICATION
         if decision == ResponseAction.STEP_UP_VERIFICATION.value:
             raise RuntimeEnforcementError(
                 "Additional verification required before execution"
             )
 
-        # REDUCE SCOPE
         if decision == ResponseAction.REDUCE_SCOPE.value:
             raise RuntimeEnforcementError(
                 "Execution requires reduced scope"
             )
 
-        # HUMAN REVIEW
         if decision == ResponseAction.HUMAN_REVIEW.value:
             raise RuntimeEnforcementError(
                 "Execution paused pending human review"
             )
 
-        # UNKNOWN DECISION
         raise RuntimeEnforcementError(
             f"Unknown security decision: {decision}"
         )

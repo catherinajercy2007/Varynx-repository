@@ -99,3 +99,37 @@ def test_authorization_allow_reaches_runtime(monkeypatch):
 
     assert result == "executed"
     assert executed == [{"resource": "sales.csv"}]
+
+def test_blocked_runtime_event_can_be_retrieved(monkeypatch, tmp_path):
+    from app import database
+
+    database_file = tmp_path / "runtime_audit.db"
+    monkeypatch.setattr(database, "DATABASE_FILE", database_file)
+
+    database.initialize_database()
+
+    service = RuntimeExecutionService()
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "sensitive_data"},
+            agent_id="test-agent",
+            task_id="test-task",
+            action="read",
+            resource="sensitive_data",
+            risk=100,
+            reason="Runtime security blocked execution",
+        )
+
+    events = database.get_audit_events()
+
+    assert len(events) == 1
+    assert events[0]["agent_id"] == "test-agent"
+    assert events[0]["task_id"] == "test-task"
+    assert events[0]["action"] == "read"
+    assert events[0]["resource"] == "sensitive_data"
+    assert events[0]["decision"] == "BLOCK"
+    assert events[0]["risk"] == 100
+    assert events[0]["reason"] == "Runtime security blocked execution"

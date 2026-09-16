@@ -133,3 +133,21 @@ def test_blocked_runtime_event_can_be_retrieved(monkeypatch, tmp_path):
     assert events[0]["decision"] == "BLOCK"
     assert events[0]["risk"] == 100
     assert events[0]["reason"] == "Runtime security blocked execution"
+
+def test_allow_with_monitoring_reaches_runtime():
+    executed = []
+
+    def fake_tool(request):
+        executed.append(request)
+        return "executed"
+
+    service = RuntimeExecutionService()
+
+    result = service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=fake_tool,
+        request={"resource": "sales.csv"},
+    )
+
+    assert result == "executed"
+    assert executed == [{"resource": "sales.csv"}]

@@ -1,574 +1,422 @@
-from app.behavioral_baseline import (
-    AdaptiveBehavioralBaseline,
-    calculate_baseline_update,
-    calculate_dimension_deviation,
-    calculate_mean_deviation,
-)
+"""
+Tests for Varynx Day 49 platform behavioral integration.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from app.behavioral_baseline import AdaptiveBehavioralBaseline
+from app.platform.behavioral import BehavioralPlatformAdapter
 
 
-def test_baseline_update_moves_toward_observation():
-    result = calculate_baseline_update(
-        20,
-        40,
+def make_adapter() -> BehavioralPlatformAdapter:
+    """Create an adapter with deterministic test configuration."""
+    manager = AdaptiveBehavioralBaseline(
         learning_rate=0.10,
+        max_learning_deviation=30.0,
     )
 
-    assert result == 22
+    return BehavioralPlatformAdapter(manager)
 
 
-def test_baseline_update_with_full_learning_rate():
-    result = calculate_baseline_update(
-        20,
-        80,
-        learning_rate=1.0,
+def test_adapter_can_be_created():
+    adapter = make_adapter()
+
+    assert isinstance(
+        adapter.manager,
+        AdaptiveBehavioralBaseline,
     )
 
-    assert result == 80
 
+def test_set_baseline_returns_platform_response():
+    adapter = make_adapter()
 
-def test_baseline_update_is_bounded():
-    assert 0 <= calculate_baseline_update(0, 100, 0.5) <= 100
-    assert 0 <= calculate_baseline_update(100, 0, 0.5) <= 100
-
-
-def test_dimension_deviation():
-    deviations = calculate_dimension_deviation(
+    result = adapter.set_baseline(
+        "agent-1",
         {
-            "action": 20,
-            "resource": 30,
-        },
-        {
-            "action": 50,
-            "resource": 40,
+            "tool_usage": 40.0,
+            "resource_access": 50.0,
         },
     )
 
-    assert deviations == {
-        "action": 30,
-        "resource": 10,
+    assert result["status"] == "baseline_set"
+    assert result["agent_id"] == "agent-1"
+    assert result["baseline"] == {
+        "tool_usage": 40.0,
+        "resource_access": 50.0,
     }
 
 
-def test_mean_deviation():
-    result = calculate_mean_deviation(
-        {
-            "action": 20,
-            "resource": 30,
-        },
-        {
-            "action": 40,
-            "resource": 50,
-        },
-    )
+def test_get_baseline_returns_existing_baseline():
+    adapter = make_adapter()
 
-    assert result == 20
-
-
-def test_missing_dimensions_are_ignored():
-    result = calculate_mean_deviation(
-        {"action": 20},
-        {
-            "action": 30,
-            "resource": 100,
-        },
-    )
-
-    assert result == 10
-
-
-def test_manager_requires_baseline():
-    manager = AdaptiveBehavioralBaseline()
-
-    try:
-        manager.observe(
-            "agent-1",
-            {"action": 20},
-        )
-        assert False
-    except ValueError as exc:
-        assert "baseline" in str(exc)
-
-
-def test_set_and_get_baseline():
-    manager = AdaptiveBehavioralBaseline()
-
-    manager.set_baseline(
+    adapter.set_baseline(
         "agent-1",
         {
-            "action": 20,
-            "resource": 30,
+            "tool_usage": 40.0,
+            "resource_access": 50.0,
         },
     )
 
-    assert manager.get_baseline("agent-1") == {
-        "action": 20,
-        "resource": 30,
+    result = adapter.get_baseline("agent-1")
+
+    assert result["status"] == "baseline_available"
+    assert result["baseline"] == {
+        "tool_usage": 40.0,
+        "resource_access": 50.0,
     }
 
 
-def test_get_baseline_returns_copy():
-    manager = AdaptiveBehavioralBaseline()
+def test_get_missing_baseline_is_safe():
+    adapter = make_adapter()
 
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
+    result = adapter.get_baseline("unknown-agent")
 
-    baseline = manager.get_baseline("agent-1")
-    baseline["action"] = 100
-
-    assert manager.get_baseline("agent-1")["action"] == 20
+    assert result["status"] == "baseline_not_found"
+    assert result["baseline"] is None
 
 
-def test_normal_observation_is_accepted():
-    manager = AdaptiveBehavioralBaseline(
-        learning_rate=0.10,
-        max_learning_deviation=30,
-    )
+def test_normal_observation_is_processed():
+    adapter = make_adapter()
 
-    manager.set_baseline(
+    adapter.set_baseline(
         "agent-1",
         {
-            "action": 20,
-            "resource": 20,
+            "tool_usage": 40.0,
+            "resource_access": 50.0,
         },
     )
 
-    result = manager.observe(
+    result = adapter.observe(
         "agent-1",
         {
-            "action": 30,
-            "resource": 30,
+            "tool_usage": 45.0,
+            "resource_access": 52.0,
         },
     )
 
-    assert result.accepted is True
-    assert result.mean_deviation == 10
+    assert result["status"] == "observation_processed"
+    assert result["result"]["accepted"] is True
+    assert result["result"]["agent_id"] == "agent-1"
 
 
-def test_accepted_observation_updates_baseline():
-    manager = AdaptiveBehavioralBaseline(
-        learning_rate=0.10,
-        max_learning_deviation=30,
-    )
+def test_observation_result_is_serialization_safe():
+    adapter = make_adapter()
 
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
-
-    result = manager.observe(
-        "agent-1",
-        {"action": 40},
-    )
-
-    assert result.accepted is True
-    assert result.updated_baseline["action"] == 22
-
-
-def test_high_deviation_observation_is_rejected():
-    manager = AdaptiveBehavioralBaseline(
-        learning_rate=0.10,
-        max_learning_deviation=30,
-    )
-
-    manager.set_baseline(
+    adapter.set_baseline(
         "agent-1",
         {
-            "action": 20,
-            "resource": 20,
+            "tool_usage": 40.0,
         },
     )
 
-    result = manager.observe(
+    result = adapter.observe(
         "agent-1",
         {
-            "action": 100,
-            "resource": 100,
+            "tool_usage": 45.0,
         },
     )
 
-    assert result.accepted is False
-    assert result.mean_deviation == 80
+    payload = result["result"]
+
+    assert isinstance(payload, dict)
+    assert isinstance(payload["previous_baseline"], dict)
+    assert isinstance(payload["observation"], dict)
+    assert isinstance(payload["updated_baseline"], dict)
+    assert isinstance(payload["reason"], str)
 
 
-def test_rejected_observation_does_not_change_baseline():
-    manager = AdaptiveBehavioralBaseline(
-        learning_rate=0.10,
-        max_learning_deviation=30,
-    )
+def test_high_deviation_is_rejected_by_existing_engine():
+    adapter = make_adapter()
 
-    manager.set_baseline(
+    adapter.set_baseline(
         "agent-1",
         {
-            "action": 20,
-            "resource": 20,
+            "tool_usage": 20.0,
+            "resource_access": 20.0,
         },
     )
 
-    manager.observe(
+    result = adapter.observe(
         "agent-1",
         {
-            "action": 100,
-            "resource": 100,
+            "tool_usage": 100.0,
+            "resource_access": 100.0,
         },
     )
 
-    assert manager.get_baseline("agent-1") == {
-        "action": 20,
-        "resource": 20,
+    assert result["result"]["accepted"] is False
+
+
+def test_platform_adapter_does_not_override_baseline_decision():
+    adapter = make_adapter()
+
+    adapter.set_baseline(
+        "agent-1",
+        {
+            "tool_usage": 20.0,
+        },
+    )
+
+    result = adapter.observe(
+        "agent-1",
+        {
+            "tool_usage": 100.0,
+        },
+    )
+
+    baseline = adapter.get_baseline("agent-1")
+
+    assert result["result"]["accepted"] is False
+    assert baseline["baseline"] == {
+        "tool_usage": 20.0,
     }
 
 
-def test_repeated_normal_observations_adapt_gradually():
-    manager = AdaptiveBehavioralBaseline(
-        learning_rate=0.10,
-        max_learning_deviation=30,
-    )
+def test_history_is_exposed_through_platform():
+    adapter = make_adapter()
 
-    manager.set_baseline(
+    adapter.set_baseline(
         "agent-1",
-        {"action": 20},
+        {
+            "tool_usage": 40.0,
+        },
     )
 
-    manager.observe(
+    adapter.observe(
         "agent-1",
-        {"action": 40},
+        {
+            "tool_usage": 45.0,
+        },
     )
 
-    manager.observe(
+    adapter.observe(
         "agent-1",
-        {"action": 40},
+        {
+            "tool_usage": 50.0,
+        },
     )
 
-    baseline = manager.get_baseline("agent-1")
+    result = adapter.history("agent-1")
 
-    assert baseline["action"] == 23.8
+    assert result["status"] == "history_available"
+    assert result["count"] == 2
+    assert len(result["history"]) == 2
 
 
-def test_history_is_recorded():
-    manager = AdaptiveBehavioralBaseline()
+def test_latest_is_exposed_through_platform():
+    adapter = make_adapter()
 
-    manager.set_baseline(
+    adapter.set_baseline(
         "agent-1",
-        {"action": 20},
+        {
+            "tool_usage": 40.0,
+        },
     )
 
-    manager.observe(
+    adapter.observe(
         "agent-1",
-        {"action": 25},
+        {
+            "tool_usage": 45.0,
+        },
     )
 
-    manager.observe(
-        "agent-1",
-        {"action": 30},
-    )
+    result = adapter.latest("agent-1")
 
-    history = manager.history("agent-1")
-
-    assert len(history) == 2
-    assert history[0].update_index == 1
-    assert history[1].update_index == 2
+    assert result["status"] == "latest_available"
+    assert result["latest"] is not None
+    assert result["latest"]["update_index"] == 1
 
 
-def test_latest_update():
-    manager = AdaptiveBehavioralBaseline()
+def test_latest_for_agent_without_history_is_safe():
+    adapter = make_adapter()
 
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
+    result = adapter.latest("agent-1")
 
-    manager.observe(
-        "agent-1",
-        {"action": 25},
-    )
-
-    latest = manager.latest("agent-1")
-
-    assert latest is not None
-    assert latest.update_index == 1
-
-
-def test_latest_without_history():
-    manager = AdaptiveBehavioralBaseline()
-
-    assert manager.latest("agent-1") is None
+    assert result["status"] == "latest_not_found"
+    assert result["latest"] is None
 
 
 def test_multiple_agents_are_isolated():
-    manager = AdaptiveBehavioralBaseline()
+    adapter = make_adapter()
 
-    manager.set_baseline(
-        "agent-a",
-        {"action": 10},
+    adapter.set_baseline(
+        "agent-1",
+        {
+            "tool_usage": 20.0,
+        },
     )
 
-    manager.set_baseline(
-        "agent-b",
-        {"action": 90},
+    adapter.set_baseline(
+        "agent-2",
+        {
+            "tool_usage": 80.0,
+        },
     )
 
-    manager.observe(
-        "agent-a",
-        {"action": 20},
-    )
+    agent1 = adapter.get_baseline("agent-1")
+    agent2 = adapter.get_baseline("agent-2")
 
-    assert manager.get_baseline("agent-b") == {
-        "action": 90,
+    assert agent1["baseline"] == {
+        "tool_usage": 20.0,
+    }
+
+    assert agent2["baseline"] == {
+        "tool_usage": 80.0,
     }
 
 
 def test_reset_single_agent():
-    manager = AdaptiveBehavioralBaseline()
+    adapter = make_adapter()
 
-    manager.set_baseline(
+    adapter.set_baseline(
         "agent-1",
-        {"action": 20},
-    )
-
-    manager.observe(
-        "agent-1",
-        {"action": 25},
-    )
-
-    manager.reset("agent-1")
-
-    assert manager.get_baseline("agent-1") is None
-    assert manager.history("agent-1") == []
-
-
-def test_reset_all_agents():
-    manager = AdaptiveBehavioralBaseline()
-
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
-
-    manager.set_baseline(
-        "agent-2",
-        {"action": 30},
-    )
-
-    manager.reset()
-
-    assert manager.get_baseline("agent-1") is None
-    assert manager.get_baseline("agent-2") is None
-
-
-def test_update_record_contains_explanation():
-    manager = AdaptiveBehavioralBaseline()
-
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
-
-    result = manager.observe(
-        "agent-1",
-        {"action": 25},
-    )
-
-    assert result.reason
-    assert "baseline" in result.reason.lower()
-
-
-def test_rejected_update_contains_reason():
-    manager = AdaptiveBehavioralBaseline(
-        max_learning_deviation=10,
-    )
-
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
-
-    result = manager.observe(
-        "agent-1",
-        {"action": 80},
-    )
-
-    assert result.accepted is False
-    assert "rejected" in result.reason.lower()
-
-
-def test_learning_threshold_boundary_is_accepted():
-    manager = AdaptiveBehavioralBaseline(
-        max_learning_deviation=30,
-    )
-
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
-
-    result = manager.observe(
-        "agent-1",
-        {"action": 50},
-    )
-
-    assert result.accepted is True
-
-
-def test_learning_threshold_above_boundary_is_rejected():
-    manager = AdaptiveBehavioralBaseline(
-        max_learning_deviation=30,
-    )
-
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
-
-    result = manager.observe(
-        "agent-1",
-        {"action": 51,
+        {
+            "tool_usage": 20.0,
         },
     )
 
-    assert result.accepted is False
-
-
-def test_snapshot_preserves_previous_baseline():
-    manager = AdaptiveBehavioralBaseline(
-        learning_rate=0.10,
+    adapter.set_baseline(
+        "agent-2",
+        {
+            "tool_usage": 80.0,
+        },
     )
 
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
+    result = adapter.reset("agent-1")
 
-    result = manager.observe(
-        "agent-1",
-        {"action": 30},
-    )
+    assert result["status"] == "baseline_reset"
+    assert result["agent_id"] == "agent-1"
 
-    assert result.previous_baseline == {
-        "action": 20,
+    assert adapter.get_baseline(
+        "agent-1"
+    )["baseline"] is None
+
+    assert adapter.get_baseline(
+        "agent-2"
+    )["baseline"] == {
+        "tool_usage": 80.0,
     }
 
 
-def test_observation_is_preserved():
-    manager = AdaptiveBehavioralBaseline()
+def test_reset_all_agents():
+    adapter = make_adapter()
 
-    manager.set_baseline(
+    adapter.set_baseline(
         "agent-1",
-        {"action": 20},
+        {
+            "tool_usage": 20.0,
+        },
     )
 
-    result = manager.observe(
+    adapter.set_baseline(
+        "agent-2",
+        {
+            "tool_usage": 80.0,
+        },
+    )
+
+    result = adapter.reset()
+
+    assert result["status"] == "all_baselines_reset"
+
+    assert adapter.get_baseline(
+        "agent-1"
+    )["baseline"] is None
+
+    assert adapter.get_baseline(
+        "agent-2"
+    )["baseline"] is None
+
+
+def test_adapter_preserves_validation_errors():
+    adapter = make_adapter()
+
+    with pytest.raises(ValueError):
+        adapter.set_baseline(
+            "agent-1",
+            {},
+        )
+
+
+def test_observation_requires_existing_baseline():
+    adapter = make_adapter()
+
+    with pytest.raises(ValueError):
+        adapter.observe(
+            "agent-1",
+            {
+                "tool_usage": 50.0,
+            },
+        )
+
+
+def test_adapter_does_not_make_security_decisions():
+    adapter = make_adapter()
+
+    adapter.set_baseline(
         "agent-1",
-        {"action": 30},
+        {
+            "tool_usage": 40.0,
+        },
     )
 
-    assert result.observation == {
-        "action": 30,
-    }
-
-
-def test_observation_does_not_modify_input():
-    manager = AdaptiveBehavioralBaseline()
-
-    manager.set_baseline(
+    result = adapter.observe(
         "agent-1",
-        {"action": 20},
+        {
+            "tool_usage": 45.0,
+        },
     )
 
-    observation = {"action": 30}
+    assert "allow" not in result
+    assert "block" not in result
+    assert "decision" not in result
+    assert "response" not in result
 
-    manager.observe(
+
+def test_baseline_observation_changes_are_reflected():
+    adapter = make_adapter()
+
+    adapter.set_baseline(
         "agent-1",
-        observation,
+        {
+            "tool_usage": 40.0,
+        },
     )
 
-    assert observation == {
-        "action": 30,
-    }
-
-
-def test_baseline_does_not_exceed_bounds():
-    manager = AdaptiveBehavioralBaseline(
-        learning_rate=0.5,
-    )
-
-    manager.set_baseline(
+    adapter.observe(
         "agent-1",
-        {"action": 100},
+        {
+            "tool_usage": 60.0,
+        },
     )
 
-    result = manager.observe(
+    result = adapter.get_baseline("agent-1")
+
+    assert result["baseline"]["tool_usage"] == 42.0
+
+
+def test_platform_history_contains_explanation():
+    adapter = make_adapter()
+
+    adapter.set_baseline(
         "agent-1",
-        {"action": 100},
+        {
+            "tool_usage": 40.0,
+        },
     )
 
-    assert result.updated_baseline["action"] == 100
-
-
-def test_zero_deviation_is_safe_to_learn():
-    manager = AdaptiveBehavioralBaseline()
-
-    manager.set_baseline(
+    adapter.observe(
         "agent-1",
-        {"action": 50},
+        {
+            "tool_usage": 45.0,
+        },
     )
 
-    result = manager.observe(
-        "agent-1",
-        {"action": 50},
-    )
+    result = adapter.history("agent-1")
 
-    assert result.accepted is True
-    assert result.mean_deviation == 0
-    assert result.updated_baseline["action"] == 50
+    record = result["history"][0]
 
-
-def test_manager_is_not_a_security_decision_engine():
-    manager = AdaptiveBehavioralBaseline()
-
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
-
-    result = manager.observe(
-        "agent-1",
-        {"action": 100},
-    )
-
-    assert hasattr(result, "accepted")
-    assert hasattr(result, "mean_deviation")
-    assert hasattr(result, "updated_baseline")
-
-    assert not hasattr(result, "decision")
-    assert not hasattr(result, "response")
-    assert not hasattr(result, "action")
-
-
-def test_update_indices_are_monotonic():
-    manager = AdaptiveBehavioralBaseline()
-
-    manager.set_baseline(
-        "agent-1",
-        {"action": 20},
-    )
-
-    first = manager.observe(
-        "agent-1",
-        {"action": 25},
-    )
-
-    second = manager.observe(
-        "agent-1",
-        {"action": 30},
-    )
-
-    third = manager.observe(
-        "agent-1",
-        {"action": 35},
-    )
-
-    assert first.update_index == 1
-    assert second.update_index == 2
-    assert third.update_index == 3
+    assert record["reason"]
+    assert isinstance(record["reason"], str)

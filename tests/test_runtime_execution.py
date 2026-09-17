@@ -60,3 +60,29 @@ def test_blocked_runtime_execution_is_audited():
         )
 
     assert executed == []
+
+@pytest.mark.parametrize(
+    "decision",
+    [
+        "STEP_UP_VERIFICATION",
+        "REDUCE_SCOPE",
+        "HUMAN_REVIEW",
+    ],
+)
+def test_containment_decisions_stop_runtime_execution(decision):
+    executed = []
+
+    def fake_tool(request):
+        executed.append(request)
+        return "executed"
+
+    service = RuntimeExecutionService()
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision=decision,
+            tool=fake_tool,
+            request={"resource": "sensitive_data"},
+        )
+
+    assert executed == []

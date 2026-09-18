@@ -151,3 +151,21 @@ def test_allow_with_monitoring_reaches_runtime():
 
     assert result == "executed"
     assert executed == [{"resource": "sales.csv"}]
+
+def test_unknown_runtime_decision_is_rejected():
+    executed = []
+
+    def fake_tool(request):
+        executed.append(request)
+        return "executed"
+
+    service = RuntimeExecutionService()
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="UNKNOWN_DECISION",
+            tool=fake_tool,
+            request={"resource": "sensitive_data"},
+        )
+
+    assert executed == []

@@ -1,18 +1,27 @@
 """
-Varynx Day 49
-Platform integration for adaptive behavioral baselines.
+Varynx Day 49-50
+Platform integration for adaptive behavioral baselines and
+behavioral intelligence.
 
 This module provides a thin platform-facing adapter around the
-existing app.behavioral_baseline implementation.
+existing behavioral baseline and behavioral intelligence components.
 
-The platform layer is responsible for:
-- exposing baseline operations through a stable interface
-- converting internal baseline records into serialization-safe dictionaries
-- preserving agent isolation
-- keeping security decisions outside the platform adapter
+Day 49 responsibilities:
+- expose baseline operations through a stable interface
+- convert internal baseline records into serialization-safe dictionaries
+- preserve agent isolation
+- keep security decisions outside the platform adapter
 
-The underlying AdaptiveBehavioralBaseline remains the owner of
-baseline learning and deviation logic.
+Day 50 responsibilities:
+- accept behavioral-intelligence snapshots
+- maintain per-agent intelligence history
+- expose latest behavioral-intelligence state
+- expose serialized behavioral-intelligence history
+- preserve independent trust, state, and deviation outputs
+- provide a stable platform-facing representation
+
+The underlying behavioral components remain responsible for their
+own algorithms and analytical logic.
 
 This module does not:
 - authorize requests
@@ -20,7 +29,9 @@ This module does not:
 - modify permissions
 - calculate dynamic trust
 - perform BCSE analysis
+- calculate a new aggregate risk score
 - select adaptive security responses
+- infer malicious intent
 """
 
 from __future__ import annotations
@@ -30,6 +41,10 @@ from typing import Any, Mapping, Optional
 from app.behavioral_baseline import (
     AdaptiveBehavioralBaseline,
     BaselineUpdate,
+)
+
+from app.behavioral_intelligence import (
+    BehavioralIntelligenceSnapshot,
 )
 
 
@@ -49,11 +64,19 @@ def _serialize_update(update: BaselineUpdate) -> dict[str, Any]:
 
 class BehavioralPlatformAdapter:
     """
-    Platform-facing adapter for Varynx behavioral baselines.
+    Platform-facing adapter for behavioral baselines and
+    behavioral intelligence.
 
-    The adapter delegates all behavioral baseline decisions to the
-    existing AdaptiveBehavioralBaseline implementation rather than
-    duplicating its logic.
+    Day 49:
+        Delegates behavioral-baseline operations to
+        AdaptiveBehavioralBaseline.
+
+    Day 50:
+        Stores and exposes read-only BehavioralIntelligenceSnapshot
+        objects for later API, gateway, dashboard, and runtime use.
+
+    The adapter does not duplicate behavioral algorithms or make
+    security decisions.
     """
 
     def __init__(
@@ -68,10 +91,19 @@ class BehavioralPlatformAdapter:
             else AdaptiveBehavioralBaseline()
         )
 
+        self._intelligence_history: dict[
+            str,
+            list[BehavioralIntelligenceSnapshot],
+        ] = {}
+
     @property
     def manager(self) -> AdaptiveBehavioralBaseline:
         """Return the underlying baseline manager."""
         return self._manager
+
+    # ------------------------------------------------------------------
+    # Day 49 - Behavioral baseline platform integration
+    # ------------------------------------------------------------------
 
     def set_baseline(
         self,
@@ -188,5 +220,144 @@ class BehavioralPlatformAdapter:
 
         return {
             "status": "baseline_reset",
+            "agent_id": agent_id,
+        }
+
+    # ------------------------------------------------------------------
+    # Day 50 - Behavioral intelligence platform integration
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _serialize_intelligence(
+        snapshot: BehavioralIntelligenceSnapshot,
+    ) -> dict[str, Any]:
+        """
+        Convert a behavioral-intelligence snapshot into a
+        JSON-safe platform representation.
+
+        Individual component outputs remain independent.
+        No aggregate risk or security decision is introduced.
+        """
+        return {
+            "agent_id": snapshot.agent_id,
+            "trust_score": snapshot.trust_score,
+            "trust_band": snapshot.trust_band,
+            "state_score": snapshot.state_score,
+            "state_level": snapshot.state_level,
+            "deviation_score": snapshot.deviation_score,
+            "deviation_level": snapshot.deviation_level,
+            "baseline_adapted": snapshot.baseline_adapted,
+            "evidence": list(snapshot.evidence),
+            "consistency_flags": list(
+                snapshot.consistency_flags
+            ),
+        }
+
+    def record_intelligence(
+        self,
+        snapshot: BehavioralIntelligenceSnapshot,
+    ) -> dict[str, Any]:
+        """
+        Record a behavioral-intelligence snapshot.
+
+        The snapshot is stored for platform/API/dashboard consumption.
+
+        The underlying behavioral-intelligence snapshot is not modified,
+        and the platform does not make a security decision.
+        """
+        if not isinstance(
+            snapshot,
+            BehavioralIntelligenceSnapshot,
+        ):
+            raise TypeError(
+                "snapshot must be a BehavioralIntelligenceSnapshot"
+            )
+
+        self._intelligence_history.setdefault(
+            snapshot.agent_id,
+            [],
+        ).append(snapshot)
+
+        return {
+            "status": "intelligence_recorded",
+            "agent_id": snapshot.agent_id,
+        }
+
+    def latest_intelligence(
+        self,
+        agent_id: str,
+    ) -> dict[str, Any]:
+        """
+        Return the latest behavioral-intelligence snapshot for an agent.
+        """
+        history = self._intelligence_history.get(
+            agent_id,
+            [],
+        )
+
+        latest = history[-1] if history else None
+
+        return {
+            "status": (
+                "latest_available"
+                if latest is not None
+                else "latest_not_found"
+            ),
+            "agent_id": agent_id,
+            "intelligence": (
+                self._serialize_intelligence(latest)
+                if latest is not None
+                else None
+            ),
+        }
+
+    def intelligence_history(
+        self,
+        agent_id: str,
+    ) -> dict[str, Any]:
+        """
+        Return serialized behavioral-intelligence history for an agent.
+        """
+        history = self._intelligence_history.get(
+            agent_id,
+            [],
+        )
+
+        return {
+            "status": "history_available",
+            "agent_id": agent_id,
+            "count": len(history),
+            "intelligence": [
+                self._serialize_intelligence(snapshot)
+                for snapshot in history
+            ],
+        }
+
+    def reset_intelligence(
+        self,
+        agent_id: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        Reset stored behavioral-intelligence snapshots.
+
+        If agent_id is supplied, only that agent's intelligence history
+        is removed.
+
+        If agent_id is omitted, all intelligence history is removed.
+        """
+        if agent_id is None:
+            self._intelligence_history.clear()
+
+            return {
+                "status": "all_intelligence_reset",
+            }
+
+        self._intelligence_history.pop(
+            agent_id,
+            None,
+        )
+
+        return {
+            "status": "intelligence_reset",
             "agent_id": agent_id,
         }

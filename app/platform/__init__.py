@@ -9,6 +9,7 @@ modifying the core security engine.
 
 from .behavioral import BehavioralPlatformAdapter
 from .bcse import BCSEPlatformAdapter
+from .bcse_consequence import BCSEConsequencePlatformAdapter
 from .config import PlatformConfig, get_platform_config
 from .health import health_check, readiness_check
 from .metrics import PlatformMetrics, get_metrics
@@ -16,6 +17,7 @@ from .metrics import PlatformMetrics, get_metrics
 __all__ = [
     "BehavioralPlatformAdapter",
     "BCSEPlatformAdapter",
+    "BCSEConsequencePlatformAdapter",
     "PlatformConfig",
     "get_platform_config",
     "health_check",

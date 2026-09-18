@@ -151,3 +151,38 @@ def test_allow_with_monitoring_reaches_runtime():
 
     assert result == "executed"
     assert executed == [{"resource": "sales.csv"}]
+
+def test_unknown_runtime_decision_is_rejected():
+    executed = []
+
+    def fake_tool(request):
+        executed.append(request)
+        return "executed"
+
+    service = RuntimeExecutionService()
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="UNKNOWN_DECISION",
+            tool=fake_tool,
+            request={"resource": "sensitive_data"},
+        )
+
+    assert executed == []
+
+def test_allow_with_monitoring_records_security_event():
+    service = RuntimeExecutionService()
+
+    result = service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "sales.csv"},
+    )
+
+    assert result == "executed"
+    assert len(service.gateway.security_events) == 1
+    assert service.gateway.security_events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert service.gateway.security_events[0]["action"] == "executed_with_monitoring"
+    assert service.gateway.security_events[0]["request"] == {
+        "resource": "sales.csv"
+    }

@@ -253,3 +253,25 @@ def test_runtime_security_events_can_be_filtered_by_action():
     assert blocked_events[0]["request"] == {
         "resource": "sensitive_data"
     }
+
+def test_runtime_block_event_preserves_security_metadata():
+    service = RuntimeExecutionService()
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "restricted.csv"},
+            agent_id="agent-55",
+            task_id="task-55",
+            action="read",
+            resource="restricted.csv",
+            risk=95,
+            reason="High risk runtime request",
+        )
+
+    event = service.gateway.security_events[0]
+
+    assert event["decision"] == "BLOCK"
+    assert event["action"] == "execution_blocked"
+    assert event["request"] == {"resource": "restricted.csv"}

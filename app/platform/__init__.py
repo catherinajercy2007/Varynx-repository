@@ -20,6 +20,7 @@ from app.platform.bcse_evaluation import (
 from app.platform.bcse_integration import (
     BCSEIntegrationPlatformAdapter,
 )
+from app.platform.predictive_security import PredictiveSecurityPlatformAdapter
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -33,4 +34,5 @@ __all__ = [
     "get_metrics",
     "BCSEEvaluationPlatformAdapter",
     "BCSEIntegrationPlatformAdapter",
+    "PredictiveSecurityPlatformAdapter",
 ]

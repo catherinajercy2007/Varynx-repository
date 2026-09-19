@@ -332,3 +332,27 @@ def test_runtime_security_events_preserve_execution_order():
 
     assert events[2]["action"] == "executed_with_monitoring"
     assert events[2]["request"] == {"resource": "third.csv"}
+
+def test_runtime_security_event_decision_matches_action():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "monitored.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "blocked.csv"},
+        )
+
+    events = service.gateway.security_events
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+
+    assert events[1]["decision"] == "BLOCK"
+    assert events[1]["action"] == "execution_blocked"

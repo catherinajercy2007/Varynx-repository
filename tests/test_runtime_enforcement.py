@@ -215,3 +215,41 @@ def test_runtime_security_events_are_preserved_across_executions():
     assert events[1]["decision"] == "ALLOW_WITH_MONITORING"
     assert events[1]["action"] == "executed_with_monitoring"
     assert events[1]["request"] == {"resource": "second.csv"}
+
+def test_runtime_security_events_can_be_filtered_by_action():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "sales.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "sensitive_data"},
+        )
+
+    monitoring_events = [
+        event
+        for event in service.gateway.security_events
+        if event["action"] == "executed_with_monitoring"
+    ]
+
+    blocked_events = [
+        event
+        for event in service.gateway.security_events
+        if event["action"] == "execution_blocked"
+    ]
+
+    assert len(monitoring_events) == 1
+    assert monitoring_events[0]["request"] == {
+        "resource": "sales.csv"
+    }
+
+    assert len(blocked_events) == 1
+    assert blocked_events[0]["request"] == {
+        "resource": "sensitive_data"
+    }

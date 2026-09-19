@@ -186,3 +186,227 @@ def test_allow_with_monitoring_records_security_event():
     assert service.gateway.security_events[0]["request"] == {
         "resource": "sales.csv"
     }
+
+def test_runtime_security_events_are_preserved_across_executions():
+    service = RuntimeExecutionService()
+
+    first_result = service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first-executed",
+        request={"resource": "first.csv"},
+    )
+
+    second_result = service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second-executed",
+        request={"resource": "second.csv"},
+    )
+
+    assert first_result == "first-executed"
+    assert second_result == "second-executed"
+
+    events = service.gateway.security_events
+
+    assert len(events) == 2
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+    assert events[0]["request"] == {"resource": "first.csv"}
+
+    assert events[1]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[1]["action"] == "executed_with_monitoring"
+    assert events[1]["request"] == {"resource": "second.csv"}
+
+def test_runtime_security_events_can_be_filtered_by_action():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "sales.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "sensitive_data"},
+        )
+
+    monitoring_events = [
+        event
+        for event in service.gateway.security_events
+        if event["action"] == "executed_with_monitoring"
+    ]
+
+    blocked_events = [
+        event
+        for event in service.gateway.security_events
+        if event["action"] == "execution_blocked"
+    ]
+
+    assert len(monitoring_events) == 1
+    assert monitoring_events[0]["request"] == {
+        "resource": "sales.csv"
+    }
+
+    assert len(blocked_events) == 1
+    assert blocked_events[0]["request"] == {
+        "resource": "sensitive_data"
+    }
+
+def test_runtime_block_event_preserves_security_metadata():
+    service = RuntimeExecutionService()
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "restricted.csv"},
+            agent_id="agent-55",
+            task_id="task-55",
+            action="read",
+            resource="restricted.csv",
+            risk=95,
+            reason="High risk runtime request",
+        )
+
+    event = service.gateway.security_events[0]
+
+    assert event["decision"] == "BLOCK"
+    assert event["action"] == "execution_blocked"
+    assert event["request"] == {"resource": "restricted.csv"}
+
+def test_previous_runtime_security_event_remains_unchanged():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first-executed",
+        request={"resource": "first.csv"},
+    )
+
+    first_event = service.gateway.security_events[0].copy()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second-executed",
+        request={"resource": "second.csv"},
+    )
+
+    assert service.gateway.security_events[0] == first_event
+    assert service.gateway.security_events[0]["request"] == {
+        "resource": "first.csv"
+    }
+
+def test_runtime_security_events_preserve_execution_order():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first-executed",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third-executed",
+        request={"resource": "third.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 3
+
+    assert events[0]["action"] == "executed_with_monitoring"
+    assert events[0]["request"] == {"resource": "first.csv"}
+
+    assert events[1]["action"] == "execution_blocked"
+    assert events[1]["request"] == {"resource": "blocked.csv"}
+
+    assert events[2]["action"] == "executed_with_monitoring"
+    assert events[2]["request"] == {"resource": "third.csv"}
+
+def test_runtime_security_event_decision_matches_action():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "monitored.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "blocked.csv"},
+        )
+
+    events = service.gateway.security_events
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+
+    assert events[1]["decision"] == "BLOCK"
+    assert events[1]["action"] == "execution_blocked"
+
+def test_runtime_security_events_contain_required_fields():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "monitored.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "blocked.csv"},
+        )
+
+    required_fields = {"decision", "request", "action"}
+
+    for event in service.gateway.security_events:
+        assert required_fields.issubset(event.keys())
+
+def test_runtime_security_event_schema_is_stable():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "monitored.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "blocked.csv"},
+        )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 2
+
+    for event in events:
+        assert isinstance(event, dict)
+        assert set(["decision", "request", "action"]).issubset(event.keys())
+        assert isinstance(event["decision"], str)
+        assert isinstance(event["action"], str)
+        assert isinstance(event["request"], dict)
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+
+    assert events[1]["decision"] == "BLOCK"
+    assert events[1]["action"] == "execution_blocked"

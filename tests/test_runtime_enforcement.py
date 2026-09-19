@@ -410,3 +410,52 @@ def test_runtime_security_event_schema_is_stable():
 
     assert events[1]["decision"] == "BLOCK"
     assert events[1]["action"] == "execution_blocked"
+
+def test_runtime_security_event_schema_values_are_valid():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "monitored.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "blocked.csv"},
+        )
+
+    events = service.gateway.security_events
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+    assert events[0]["request"] == {
+        "resource": "monitored.csv"
+    }
+
+    assert events[1]["decision"] == "BLOCK"
+    assert events[1]["action"] == "execution_blocked"
+    assert events[1]["request"] == {
+        "resource": "blocked.csv"
+    }
+
+def test_runtime_security_event_request_isolation():
+    service = RuntimeExecutionService()
+
+    first_request = {"resource": "first.csv"}
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request=first_request,
+    )
+
+    first_event = service.gateway.security_events[0]
+
+    first_request["resource"] = "modified.csv"
+
+    assert first_event["request"] == {
+        "resource": "first.csv"
+    }

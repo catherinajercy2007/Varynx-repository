@@ -186,3 +186,32 @@ def test_allow_with_monitoring_records_security_event():
     assert service.gateway.security_events[0]["request"] == {
         "resource": "sales.csv"
     }
+
+def test_runtime_security_events_are_preserved_across_executions():
+    service = RuntimeExecutionService()
+
+    first_result = service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first-executed",
+        request={"resource": "first.csv"},
+    )
+
+    second_result = service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second-executed",
+        request={"resource": "second.csv"},
+    )
+
+    assert first_result == "first-executed"
+    assert second_result == "second-executed"
+
+    events = service.gateway.security_events
+
+    assert len(events) == 2
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+    assert events[0]["request"] == {"resource": "first.csv"}
+
+    assert events[1]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[1]["action"] == "executed_with_monitoring"
+    assert events[1]["request"] == {"resource": "second.csv"}

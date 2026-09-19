@@ -275,3 +275,25 @@ def test_runtime_block_event_preserves_security_metadata():
     assert event["decision"] == "BLOCK"
     assert event["action"] == "execution_blocked"
     assert event["request"] == {"resource": "restricted.csv"}
+
+def test_previous_runtime_security_event_remains_unchanged():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first-executed",
+        request={"resource": "first.csv"},
+    )
+
+    first_event = service.gateway.security_events[0].copy()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second-executed",
+        request={"resource": "second.csv"},
+    )
+
+    assert service.gateway.security_events[0] == first_event
+    assert service.gateway.security_events[0]["request"] == {
+        "resource": "first.csv"
+    }

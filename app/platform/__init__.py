@@ -17,6 +17,9 @@ from .bcse_context import BCSEContextPlatformAdapter
 from app.platform.bcse_evaluation import (
     BCSEEvaluationPlatformAdapter,
 )
+from app.platform.bcse_integration import (
+    BCSEIntegrationPlatformAdapter,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -29,4 +32,5 @@ __all__ = [
     "PlatformMetrics",
     "get_metrics",
     "BCSEEvaluationPlatformAdapter",
+    "BCSEIntegrationPlatformAdapter",
 ]

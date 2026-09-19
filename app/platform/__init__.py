@@ -13,8 +13,10 @@ from .bcse_consequence import BCSEConsequencePlatformAdapter
 from .config import PlatformConfig, get_platform_config
 from .health import health_check, readiness_check
 from .metrics import PlatformMetrics, get_metrics
+from .bcse_context import BCSEContextPlatformAdapter
 
 __all__ = [
+    "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
     "BCSEPlatformAdapter",
     "BCSEConsequencePlatformAdapter",

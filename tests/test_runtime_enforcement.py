@@ -356,3 +356,24 @@ def test_runtime_security_event_decision_matches_action():
 
     assert events[1]["decision"] == "BLOCK"
     assert events[1]["action"] == "execution_blocked"
+
+def test_runtime_security_events_contain_required_fields():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "monitored.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "executed",
+            request={"resource": "blocked.csv"},
+        )
+
+    required_fields = {"decision", "request", "action"}
+
+    for event in service.gateway.security_events:
+        assert required_fields.issubset(event.keys())

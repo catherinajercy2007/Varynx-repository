@@ -21,7 +21,7 @@ from .predictive_control import PredictiveControlPlatformAdapter
 from .predictive_forecast import PredictiveForecastPlatformAdapter
 from .predictive_security import PredictiveSecurityPlatformAdapter
 from .predictive_trajectory import PredictiveTrajectoryPlatformAdapter
-
+from .predictive_runtime import PredictiveRuntimePlatformAdapter
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -39,4 +39,5 @@ __all__ = [
     "PredictiveTrajectoryPlatformAdapter",
     "PredictiveForecastPlatformAdapter",
     "PredictiveControlPlatformAdapter",
+    "PredictiveRuntimePlatformAdapter",
 ]

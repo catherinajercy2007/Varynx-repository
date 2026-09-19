@@ -440,3 +440,22 @@ def test_runtime_security_event_schema_values_are_valid():
     assert events[1]["request"] == {
         "resource": "blocked.csv"
     }
+
+def test_runtime_security_event_request_isolation():
+    service = RuntimeExecutionService()
+
+    first_request = {"resource": "first.csv"}
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request=first_request,
+    )
+
+    first_event = service.gateway.security_events[0]
+
+    first_request["resource"] = "modified.csv"
+
+    assert first_event["request"] == {
+        "resource": "first.csv"
+    }

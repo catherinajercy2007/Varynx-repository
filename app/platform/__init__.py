@@ -24,6 +24,9 @@ from app.platform.predictive_security import PredictiveSecurityPlatformAdapter
 from app.platform.predictive_trajectory import (
     PredictiveTrajectoryPlatformAdapter,
 )
+from app.platform.predictive_forecast import (
+    PredictiveForecastPlatformAdapter,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -39,4 +42,5 @@ __all__ = [
     "BCSEIntegrationPlatformAdapter",
     "PredictiveSecurityPlatformAdapter",
     "PredictiveTrajectoryPlatformAdapter",
+    "PredictiveForecastPlatformAdapter",
 ]

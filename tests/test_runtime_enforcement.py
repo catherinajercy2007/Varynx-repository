@@ -503,3 +503,39 @@ def test_runtime_security_event_nested_request_isolation():
             "scope": ["read", "export"],
         },
     }
+
+def test_runtime_security_events_are_isolated_from_each_other():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {"scope": ["read"]},
+        },
+    )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second",
+        request={
+            "resource": "second.csv",
+            "metadata": {"scope": ["write"]},
+        },
+    )
+
+    first_event = service.gateway.security_events[0]
+    second_event = service.gateway.security_events[1]
+
+    first_event["request"]["metadata"]["scope"].append("export")
+
+    assert first_event["request"] == {
+        "resource": "first.csv",
+        "metadata": {"scope": ["read", "export"]},
+    }
+
+    assert second_event["request"] == {
+        "resource": "second.csv",
+        "metadata": {"scope": ["write"]},
+    }

@@ -476,3 +476,30 @@ def test_runtime_security_event_request_snapshot_is_independent():
     assert event["request"] == {
         "resource": "modified.csv"
     }
+
+def test_runtime_security_event_nested_request_isolation():
+    service = RuntimeExecutionService()
+
+    request = {
+        "resource": "sensitive.csv",
+        "metadata": {
+            "scope": ["read", "export"],
+        },
+    }
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request=request,
+    )
+
+    request["metadata"]["scope"].append("admin")
+
+    event = service.gateway.security_events[0]
+
+    assert event["request"] == {
+        "resource": "sensitive.csv",
+        "metadata": {
+            "scope": ["read", "export"],
+        },
+    }

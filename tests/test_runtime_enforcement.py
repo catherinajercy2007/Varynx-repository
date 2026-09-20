@@ -459,3 +459,20 @@ def test_runtime_security_event_request_isolation():
     assert first_event["request"] == {
         "resource": "first.csv"
     }
+
+def test_runtime_security_event_request_snapshot_is_independent():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={"resource": "first.csv"},
+    )
+
+    event = service.gateway.security_events[0]
+
+    event["request"]["resource"] = "modified.csv"
+
+    assert event["request"] == {
+        "resource": "modified.csv"
+    }

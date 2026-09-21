@@ -625,3 +625,46 @@ def test_runtime_security_event_mutation_does_not_affect_other_events():
     assert events[1]["request"] == {
         "resource": "second.csv"
     }
+
+def test_runtime_security_event_collection_integrity_after_event_mutation():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third",
+        request={"resource": "third.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    events[0]["request"]["resource"] = "modified-first.csv"
+
+    assert len(events) == 3
+
+    assert events[0]["action"] == "executed_with_monitoring"
+    assert events[0]["request"] == {
+        "resource": "modified-first.csv"
+    }
+
+    assert events[1]["action"] == "execution_blocked"
+    assert events[1]["request"] == {
+        "resource": "blocked.csv"
+    }
+
+    assert events[2]["action"] == "executed_with_monitoring"
+    assert events[2]["request"] == {
+        "resource": "third.csv"
+    }

@@ -592,3 +592,36 @@ def test_runtime_security_events_preserve_nested_request_order():
         "resource": "third.csv",
         "metadata": {"scope": ["write"]},
     }
+
+def test_runtime_security_event_mutation_does_not_affect_other_events():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second",
+        request={"resource": "second.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    events[0]["action"] = "modified_action"
+
+    assert len(events) == 2
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "modified_action"
+    assert events[0]["request"] == {
+        "resource": "first.csv"
+    }
+
+    assert events[1]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[1]["action"] == "executed_with_monitoring"
+    assert events[1]["request"] == {
+        "resource": "second.csv"
+    }

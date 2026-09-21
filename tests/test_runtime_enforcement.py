@@ -539,3 +539,56 @@ def test_runtime_security_events_are_isolated_from_each_other():
         "resource": "second.csv",
         "metadata": {"scope": ["write"]},
     }
+
+def test_runtime_security_events_preserve_nested_request_order():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {"scope": ["read"]},
+        },
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={
+                "resource": "blocked.csv",
+                "metadata": {"scope": ["deny"]},
+            },
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third",
+        request={
+            "resource": "third.csv",
+            "metadata": {"scope": ["write"]},
+        },
+    )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 3
+
+    assert events[0]["action"] == "executed_with_monitoring"
+    assert events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {"scope": ["read"]},
+    }
+
+    assert events[1]["action"] == "execution_blocked"
+    assert events[1]["request"] == {
+        "resource": "blocked.csv",
+        "metadata": {"scope": ["deny"]},
+    }
+
+    assert events[2]["action"] == "executed_with_monitoring"
+    assert events[2]["request"] == {
+        "resource": "third.csv",
+        "metadata": {"scope": ["write"]},
+    }

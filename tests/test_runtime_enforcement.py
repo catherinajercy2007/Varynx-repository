@@ -706,3 +706,37 @@ def test_runtime_security_event_collection_remains_consistent_after_multiple_eve
     assert events[2]["decision"] == "ALLOW_WITH_MONITORING"
     assert events[2]["action"] == "executed_with_monitoring"
     assert events[2]["request"] == {"resource": "third.csv"}
+
+def test_runtime_security_event_collection_preserves_append_order():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third",
+        request={"resource": "third.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 3
+
+    assert events[0]["request"] == {"resource": "first.csv"}
+    assert events[1]["request"] == {"resource": "blocked.csv"}
+    assert events[2]["request"] == {"resource": "third.csv"}
+
+    assert events[0]["action"] == "executed_with_monitoring"
+    assert events[1]["action"] == "execution_blocked"
+    assert events[2]["action"] == "executed_with_monitoring"

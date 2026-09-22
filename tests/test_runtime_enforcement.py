@@ -852,3 +852,30 @@ def test_runtime_security_event_collection_nested_copy_isolation():
         "resource": "first.csv",
         "metadata": {"scope": ["read", "export"]},
     }
+
+def test_runtime_security_event_entries_remain_independent():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second",
+        request={"resource": "second.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    assert events[0] is not events[1]
+
+    events[0]["action"] = "modified_action"
+
+    assert events[0]["action"] == "modified_action"
+    assert events[1]["action"] == "executed_with_monitoring"
+
+    assert events[0]["request"] == {"resource": "first.csv"}
+    assert events[1]["request"] == {"resource": "second.csv"}

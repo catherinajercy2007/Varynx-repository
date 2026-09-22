@@ -879,3 +879,46 @@ def test_runtime_security_event_entries_remain_independent():
 
     assert events[0]["request"] == {"resource": "first.csv"}
     assert events[1]["request"] == {"resource": "second.csv"}
+
+def test_runtime_security_event_entries_preserve_independent_nested_requests():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {
+                "scope": ["read"],
+            },
+        },
+    )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second",
+        request={
+            "resource": "second.csv",
+            "metadata": {
+                "scope": ["write"],
+            },
+        },
+    )
+
+    events = service.gateway.security_events
+
+    events[0]["request"]["metadata"]["scope"].append("export")
+
+    assert events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {
+            "scope": ["read", "export"],
+        },
+    }
+
+    assert events[1]["request"] == {
+        "resource": "second.csv",
+        "metadata": {
+            "scope": ["write"],
+        },
+    }

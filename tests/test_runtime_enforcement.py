@@ -740,3 +740,185 @@ def test_runtime_security_event_collection_preserves_append_order():
     assert events[0]["action"] == "executed_with_monitoring"
     assert events[1]["action"] == "execution_blocked"
     assert events[2]["action"] == "executed_with_monitoring"
+
+def test_runtime_security_event_collection_remains_stable_after_event_field_mutation():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third",
+        request={"resource": "third.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    events[0]["action"] = "modified_action"
+    events[1]["request"]["resource"] = "modified-blocked.csv"
+
+    assert len(events) == 3
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "modified_action"
+
+    assert events[1]["decision"] == "BLOCK"
+    assert events[1]["action"] == "execution_blocked"
+    assert events[1]["request"] == {
+        "resource": "modified-blocked.csv"
+    }
+
+    assert events[2]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[2]["action"] == "executed_with_monitoring"
+    assert events[2]["request"] == {
+        "resource": "third.csv"
+    }
+
+def test_runtime_security_event_collection_copy_isolation():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    original_events = service.gateway.security_events
+    copied_events = list(original_events)
+
+    copied_events.pop()
+    copied_events.append(
+        {
+            "decision": "ALLOW",
+            "action": "external_event",
+            "request": {"resource": "external.csv"},
+        }
+    )
+
+    assert len(original_events) == 2
+    assert len(copied_events) == 2
+
+    assert original_events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert original_events[0]["action"] == "executed_with_monitoring"
+    assert original_events[0]["request"] == {"resource": "first.csv"}
+
+    assert original_events[1]["decision"] == "BLOCK"
+    assert original_events[1]["action"] == "execution_blocked"
+    assert original_events[1]["request"] == {"resource": "blocked.csv"}
+
+    assert copied_events[1]["action"] == "external_event"
+
+def test_runtime_security_event_collection_nested_copy_isolation():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {"scope": ["read"]},
+        },
+    )
+
+    original_events = service.gateway.security_events
+    copied_events = list(original_events)
+
+    copied_events[0]["request"]["metadata"]["scope"].append("export")
+
+    assert original_events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {"scope": ["read", "export"]},
+    }
+
+    assert copied_events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {"scope": ["read", "export"]},
+    }
+
+def test_runtime_security_event_entries_remain_independent():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second",
+        request={"resource": "second.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    assert events[0] is not events[1]
+
+    events[0]["action"] = "modified_action"
+
+    assert events[0]["action"] == "modified_action"
+    assert events[1]["action"] == "executed_with_monitoring"
+
+    assert events[0]["request"] == {"resource": "first.csv"}
+    assert events[1]["request"] == {"resource": "second.csv"}
+
+def test_runtime_security_event_entries_preserve_independent_nested_requests():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {
+                "scope": ["read"],
+            },
+        },
+    )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second",
+        request={
+            "resource": "second.csv",
+            "metadata": {
+                "scope": ["write"],
+            },
+        },
+    )
+
+    events = service.gateway.security_events
+
+    events[0]["request"]["metadata"]["scope"].append("export")
+
+    assert events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {
+            "scope": ["read", "export"],
+        },
+    }
+
+    assert events[1]["request"] == {
+        "resource": "second.csv",
+        "metadata": {
+            "scope": ["write"],
+        },
+    }

@@ -784,3 +784,44 @@ def test_runtime_security_event_collection_remains_stable_after_event_field_muta
     assert events[2]["request"] == {
         "resource": "third.csv"
     }
+
+def test_runtime_security_event_collection_copy_isolation():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    original_events = service.gateway.security_events
+    copied_events = list(original_events)
+
+    copied_events.pop()
+    copied_events.append(
+        {
+            "decision": "ALLOW",
+            "action": "external_event",
+            "request": {"resource": "external.csv"},
+        }
+    )
+
+    assert len(original_events) == 2
+    assert len(copied_events) == 2
+
+    assert original_events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert original_events[0]["action"] == "executed_with_monitoring"
+    assert original_events[0]["request"] == {"resource": "first.csv"}
+
+    assert original_events[1]["decision"] == "BLOCK"
+    assert original_events[1]["action"] == "execution_blocked"
+    assert original_events[1]["request"] == {"resource": "blocked.csv"}
+
+    assert copied_events[1]["action"] == "external_event"

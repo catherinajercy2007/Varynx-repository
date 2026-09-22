@@ -825,3 +825,30 @@ def test_runtime_security_event_collection_copy_isolation():
     assert original_events[1]["request"] == {"resource": "blocked.csv"}
 
     assert copied_events[1]["action"] == "external_event"
+
+def test_runtime_security_event_collection_nested_copy_isolation():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {"scope": ["read"]},
+        },
+    )
+
+    original_events = service.gateway.security_events
+    copied_events = list(original_events)
+
+    copied_events[0]["request"]["metadata"]["scope"].append("export")
+
+    assert original_events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {"scope": ["read", "export"]},
+    }
+
+    assert copied_events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {"scope": ["read", "export"]},
+    }

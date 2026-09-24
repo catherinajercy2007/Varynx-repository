@@ -22,6 +22,9 @@ from .predictive_forecast import PredictiveForecastPlatformAdapter
 from .predictive_security import PredictiveSecurityPlatformAdapter
 from .predictive_trajectory import PredictiveTrajectoryPlatformAdapter
 from .predictive_runtime import PredictiveRuntimePlatformAdapter
+from .unified_behavioral_pipeline import (
+    UnifiedBehavioralPipelinePlatformAdapter,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -40,4 +43,5 @@ __all__ = [
     "PredictiveForecastPlatformAdapter",
     "PredictiveControlPlatformAdapter",
     "PredictiveRuntimePlatformAdapter",
+    "UnifiedBehavioralPipelinePlatformAdapter",
 ]

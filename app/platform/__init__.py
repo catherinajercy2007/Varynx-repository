@@ -28,6 +28,9 @@ from .unified_behavioral_pipeline import (
 from .security_decision_bridge import (
     SecurityDecisionBridgePlatformAdapter,
 )
+from .security_decision_reconciliation import (
+    SecurityDecisionReconciliationPlatformAdapter,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -48,4 +51,5 @@ __all__ = [
     "PredictiveRuntimePlatformAdapter",
     "UnifiedBehavioralPipelinePlatformAdapter",
     "SecurityDecisionBridgePlatformAdapter",
+    "SecurityDecisionReconciliationPlatformAdapter",
 ]

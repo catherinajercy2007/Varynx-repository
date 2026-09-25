@@ -31,6 +31,9 @@ from .security_decision_bridge import (
 from .security_decision_reconciliation import (
     SecurityDecisionReconciliationPlatformAdapter,
 )
+from .security_decision_runtime_handoff import (
+    SecurityDecisionRuntimeHandoffPlatformAdapter,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -52,4 +55,5 @@ __all__ = [
     "UnifiedBehavioralPipelinePlatformAdapter",
     "SecurityDecisionBridgePlatformAdapter",
     "SecurityDecisionReconciliationPlatformAdapter",
+    "SecurityDecisionRuntimeHandoffPlatformAdapter",
 ]

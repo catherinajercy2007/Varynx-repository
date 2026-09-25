@@ -38,6 +38,10 @@ from .runtime_security_decision_enforcement import (
     RuntimeSecurityDecisionEnforcementBoundary,
     RuntimeSecurityRequest,
 )
+from .runtime_decision_audit import (
+    RuntimeDecisionAudit,
+    RuntimeDecisionAuditRecord,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",

@@ -1,8 +1,8 @@
 """
-Varynx Day 72 - Runtime Audit Export Pagination.
+Varynx Day 73 - Runtime Audit Export Metadata.
 
-Provides paginated, serializable export of recorded runtime
-security audit evidence.
+Provides metadata alongside paginated runtime security audit
+exports.
 
 This module does not calculate risk, create security decisions,
 authorize actions, or execute enforcement.
@@ -138,11 +138,7 @@ class RuntimeDecisionAudit:
         page_size: int = 10,
         decision: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Export one page of audit records.
-
-        Pages are one-based.
-        """
+        """Export one page of audit records."""
 
         if not isinstance(page, int) or page < 1:
             raise ValueError("page must be an integer greater than 0")
@@ -172,6 +168,33 @@ class RuntimeDecisionAudit:
             "has_next": page < total_pages,
             "has_previous": page > 1 and total_pages > 0,
             "records": records[start:end],
+        }
+
+    def export_metadata(
+        self,
+        decision: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return metadata describing the current export scope."""
+
+        records = self.export(decision)
+
+        decision_counts: Dict[str, int] = {}
+
+        for record in records:
+            current = record["decision"]
+            decision_counts[current] = (
+                decision_counts.get(current, 0) + 1
+            )
+
+        return {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "total_records": len(records),
+            "decision_filter": (
+                decision.strip().upper()
+                if isinstance(decision, str)
+                else None
+            ),
+            "decision_counts": decision_counts,
         }
 
     def snapshot(self) -> Dict[str, Dict[str, Any]]:

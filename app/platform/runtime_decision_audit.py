@@ -1,8 +1,7 @@
 """
-Varynx Day 67 - Runtime Decision Audit Evidence Retrieval.
+Varynx Day 68 - Runtime Audit Query.
 
-Extends the Day 66 runtime decision audit component with simple
-evidence retrieval capabilities.
+Provides simple querying of recorded runtime security decisions.
 
 This module does not calculate risk, create security decisions,
 authorize actions, or execute enforcement.
@@ -35,9 +34,7 @@ class RuntimeDecisionAuditRecord:
 
 class RuntimeDecisionAudit:
     """
-    Stores and retrieves runtime security decision audit evidence.
-
-    Enforcement remains outside this class.
+    Stores, retrieves, and queries runtime security audit evidence.
     """
 
     def __init__(self) -> None:
@@ -89,6 +86,21 @@ class RuntimeDecisionAudit:
             return []
 
         return list(record.evidence)
+
+    def query_by_decision(
+        self,
+        decision: str,
+    ) -> List[RuntimeDecisionAuditRecord]:
+        if not isinstance(decision, str) or not decision.strip():
+            raise ValueError("decision must be a non-empty string")
+
+        normalized = decision.strip().upper()
+
+        return [
+            record
+            for record in self._records.values()
+            if record.decision == normalized
+        ]
 
     def snapshot(self) -> Dict[str, Dict[str, Any]]:
         return {

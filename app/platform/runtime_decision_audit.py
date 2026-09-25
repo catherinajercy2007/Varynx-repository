@@ -1,8 +1,8 @@
 """
-Varynx Day 70 - Runtime Audit Export.
+Varynx Day 71 - Runtime Audit Export Filtering.
 
-Provides a serializable export of recorded runtime security
-audit evidence.
+Provides filtered, serializable export of recorded runtime
+security audit evidence.
 
 This module does not calculate risk, create security decisions,
 authorize actions, or execute enforcement.
@@ -34,7 +34,10 @@ class RuntimeDecisionAuditRecord:
 
 
 class RuntimeDecisionAudit:
-    """Stores, retrieves, queries, summarizes, and exports audit evidence."""
+    """
+    Stores, retrieves, queries, summarizes, and exports
+    runtime security audit evidence.
+    """
 
     def __init__(self) -> None:
         self._records: Dict[str, RuntimeDecisionAuditRecord] = {}
@@ -116,12 +119,25 @@ class RuntimeDecisionAudit:
             "decision_counts": decision_counts,
         }
 
-    def export(self) -> List[Dict[str, Any]]:
-        """Return all audit records as serializable dictionaries."""
+    def export(
+        self,
+        decision: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Export audit records.
+
+        When decision is provided, only records matching that
+        decision are exported.
+        """
+
+        if decision is None:
+            records = list(self._records.values())
+        else:
+            records = self.query_by_decision(decision)
 
         return [
             record.to_dict()
-            for record in self._records.values()
+            for record in records
         ]
 
     def snapshot(self) -> Dict[str, Dict[str, Any]]:

@@ -1,8 +1,7 @@
 """
-Varynx Day 73 - Runtime Audit Export Metadata.
+Varynx Day 74 - Runtime Audit Export Validation.
 
-Provides metadata alongside paginated runtime security audit
-exports.
+Provides validation for runtime security audit exports.
 
 This module does not calculate risk, create security decisions,
 authorize actions, or execute enforcement.
@@ -195,6 +194,85 @@ class RuntimeDecisionAudit:
                 else None
             ),
             "decision_counts": decision_counts,
+        }
+
+    def validate_export(
+        self,
+        records: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Validate the structure of exported audit records.
+
+        Returns a validation report instead of modifying the records.
+        """
+
+        if records is None:
+            records = self.export()
+
+        if not isinstance(records, list):
+            raise ValueError("records must be a list")
+
+        errors: List[str] = []
+
+        required_fields = {
+            "agent_id",
+            "decision",
+            "evidence",
+            "recorded_at",
+        }
+
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                errors.append(
+                    f"record {index} must be a dictionary"
+                )
+                continue
+
+            missing = required_fields - set(record.keys())
+
+            if missing:
+                errors.append(
+                    f"record {index} missing fields: "
+                    f"{sorted(missing)}"
+                )
+
+            if "agent_id" in record:
+                if (
+                    not isinstance(record["agent_id"], str)
+                    or not record["agent_id"].strip()
+                ):
+                    errors.append(
+                        f"record {index} has invalid agent_id"
+                    )
+
+            if "decision" in record:
+                if (
+                    not isinstance(record["decision"], str)
+                    or not record["decision"].strip()
+                ):
+                    errors.append(
+                        f"record {index} has invalid decision"
+                    )
+
+            if "evidence" in record:
+                if not isinstance(record["evidence"], list):
+                    errors.append(
+                        f"record {index} evidence must be a list"
+                    )
+
+            if "recorded_at" in record:
+                if (
+                    not isinstance(record["recorded_at"], str)
+                    or not record["recorded_at"].strip()
+                ):
+                    errors.append(
+                        f"record {index} has invalid recorded_at"
+                    )
+
+        return {
+            "valid": not errors,
+            "record_count": len(records),
+            "errors": errors,
         }
 
     def snapshot(self) -> Dict[str, Dict[str, Any]]:

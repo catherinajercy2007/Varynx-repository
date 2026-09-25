@@ -1,7 +1,8 @@
 """
-Varynx Day 74 - Runtime Audit Export Validation.
+Varynx Day 75 - Runtime Audit Integrity Check.
 
-Provides validation for runtime security audit exports.
+Provides integrity validation for recorded runtime security
+audit evidence.
 
 This module does not calculate risk, create security decisions,
 authorize actions, or execute enforcement.
@@ -33,7 +34,7 @@ class RuntimeDecisionAuditRecord:
 
 
 class RuntimeDecisionAudit:
-    """Stores, retrieves, queries, summarizes, and exports audit evidence."""
+    """Stores, retrieves, queries, summarizes, and validates audit evidence."""
 
     def __init__(self) -> None:
         self._records: Dict[str, RuntimeDecisionAuditRecord] = {}
@@ -200,11 +201,7 @@ class RuntimeDecisionAudit:
         self,
         records: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """
-        Validate the structure of exported audit records.
-
-        Returns a validation report instead of modifying the records.
-        """
+        """Validate the structure of exported audit records."""
 
         if records is None:
             records = self.export()
@@ -272,6 +269,47 @@ class RuntimeDecisionAudit:
         return {
             "valid": not errors,
             "record_count": len(records),
+            "errors": errors,
+        }
+
+    def integrity_check(self) -> Dict[str, Any]:
+        """
+        Check the integrity of the currently stored audit records.
+
+        The check verifies that the stored records can be converted
+        into valid exported audit records.
+        """
+
+        exported = self.export()
+        validation = self.validate_export(exported)
+
+        agent_ids = [
+            record["agent_id"]
+            for record in exported
+            if isinstance(record, dict)
+            and isinstance(record.get("agent_id"), str)
+        ]
+
+        duplicate_agent_ids = sorted(
+            {
+                agent_id
+                for agent_id in agent_ids
+                if agent_ids.count(agent_id) > 1
+            }
+        )
+
+        errors = list(validation["errors"])
+
+        if duplicate_agent_ids:
+            errors.append(
+                "duplicate agent_id values: "
+                f"{duplicate_agent_ids}"
+            )
+
+        return {
+            "valid": not errors,
+            "record_count": len(exported),
+            "duplicate_agent_ids": duplicate_agent_ids,
             "errors": errors,
         }
 

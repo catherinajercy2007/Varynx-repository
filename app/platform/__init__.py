@@ -34,6 +34,10 @@ from .security_decision_reconciliation import (
 from .security_decision_runtime_handoff import (
     SecurityDecisionRuntimeHandoffPlatformAdapter,
 )
+from .runtime_security_decision_enforcement import (
+    RuntimeSecurityDecisionEnforcementBoundary,
+    RuntimeSecurityRequest,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",

@@ -1,7 +1,7 @@
 """
-Varynx Day 71 - Runtime Audit Export Filtering.
+Varynx Day 72 - Runtime Audit Export Pagination.
 
-Provides filtered, serializable export of recorded runtime
+Provides paginated, serializable export of recorded runtime
 security audit evidence.
 
 This module does not calculate risk, create security decisions,
@@ -34,10 +34,7 @@ class RuntimeDecisionAuditRecord:
 
 
 class RuntimeDecisionAudit:
-    """
-    Stores, retrieves, queries, summarizes, and exports
-    runtime security audit evidence.
-    """
+    """Stores, retrieves, queries, summarizes, and exports audit evidence."""
 
     def __init__(self) -> None:
         self._records: Dict[str, RuntimeDecisionAuditRecord] = {}
@@ -123,12 +120,7 @@ class RuntimeDecisionAudit:
         self,
         decision: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Export audit records.
-
-        When decision is provided, only records matching that
-        decision are exported.
-        """
+        """Export all records or records matching a decision."""
 
         if decision is None:
             records = list(self._records.values())
@@ -139,6 +131,48 @@ class RuntimeDecisionAudit:
             record.to_dict()
             for record in records
         ]
+
+    def export_page(
+        self,
+        page: int = 1,
+        page_size: int = 10,
+        decision: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Export one page of audit records.
+
+        Pages are one-based.
+        """
+
+        if not isinstance(page, int) or page < 1:
+            raise ValueError("page must be an integer greater than 0")
+
+        if not isinstance(page_size, int) or page_size < 1:
+            raise ValueError(
+                "page_size must be an integer greater than 0"
+            )
+
+        records = self.export(decision)
+
+        total_records = len(records)
+        total_pages = (
+            (total_records + page_size - 1) // page_size
+            if total_records
+            else 0
+        )
+
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        return {
+            "page": page,
+            "page_size": page_size,
+            "total_records": total_records,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_previous": page > 1 and total_pages > 0,
+            "records": records[start:end],
+        }
 
     def snapshot(self) -> Dict[str, Dict[str, Any]]:
         return {

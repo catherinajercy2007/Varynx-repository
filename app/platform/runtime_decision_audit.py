@@ -1,7 +1,7 @@
 """
-Varynx Day 68 - Runtime Audit Query.
+Varynx Day 69 - Runtime Audit Summary.
 
-Provides simple querying of recorded runtime security decisions.
+Provides a compact summary of recorded runtime security decisions.
 
 This module does not calculate risk, create security decisions,
 authorize actions, or execute enforcement.
@@ -33,9 +33,7 @@ class RuntimeDecisionAuditRecord:
 
 
 class RuntimeDecisionAudit:
-    """
-    Stores, retrieves, and queries runtime security audit evidence.
-    """
+    """Stores, retrieves, queries, and summarizes runtime audit evidence."""
 
     def __init__(self) -> None:
         self._records: Dict[str, RuntimeDecisionAuditRecord] = {}
@@ -101,6 +99,20 @@ class RuntimeDecisionAudit:
             for record in self._records.values()
             if record.decision == normalized
         ]
+
+    def summary(self) -> Dict[str, Any]:
+        decision_counts: Dict[str, int] = {}
+
+        for record in self._records.values():
+            decision_counts[record.decision] = (
+                decision_counts.get(record.decision, 0) + 1
+            )
+
+        return {
+            "total_records": len(self._records),
+            "agents": len(self._records),
+            "decision_counts": decision_counts,
+        }
 
     def snapshot(self) -> Dict[str, Dict[str, Any]]:
         return {

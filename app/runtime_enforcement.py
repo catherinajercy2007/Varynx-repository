@@ -1,3 +1,4 @@
+import copy
 from typing import Any, Callable
 
 from app.adaptive_response import ResponseAction
@@ -58,7 +59,7 @@ class RuntimeSecurityGateway:
             self.security_events.append(
                 {
                     "decision": decision,
-                    "request": request,
+                    "request": copy.deepcopy(request),
                     "action": "execution_blocked",
                 }
             )
@@ -73,7 +74,7 @@ class RuntimeSecurityGateway:
         if decision == ResponseAction.ALLOW_WITH_MONITORING.value:
             event = {
                 "decision": decision,
-                "request": request,
+                "request": copy.deepcopy(request),
                 "action": "executed_with_monitoring",
             }
 

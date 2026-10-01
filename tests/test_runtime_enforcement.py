@@ -953,3 +953,49 @@ def test_runtime_security_event_snapshot_preserves_security_fields():
             "scope": ["read", "export"],
         },
     }
+
+def test_runtime_security_event_snapshot_mutation_isolated():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {
+                "scope": ["read"],
+            },
+        },
+    )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second",
+        request={
+            "resource": "second.csv",
+            "metadata": {
+                "scope": ["write"],
+            },
+        },
+    )
+
+    events = service.gateway.security_events
+
+    events[0]["request"]["metadata"]["scope"].append("export")
+    events[0]["action"] = "modified_action"
+
+    assert events[0]["action"] == "modified_action"
+    assert events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {
+            "scope": ["read", "export"],
+        },
+    }
+
+    assert events[1]["action"] == "executed_with_monitoring"
+    assert events[1]["request"] == {
+        "resource": "second.csv",
+        "metadata": {
+            "scope": ["write"],
+        },
+    }

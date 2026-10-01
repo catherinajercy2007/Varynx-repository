@@ -922,3 +922,229 @@ def test_runtime_security_event_entries_preserve_independent_nested_requests():
             "scope": ["write"],
         },
     }
+
+def test_runtime_security_event_snapshot_preserves_security_fields():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "sensitive.csv",
+            "metadata": {
+                "scope": ["read", "export"],
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+
+    assert set(event.keys()) == {
+        "decision",
+        "request",
+        "action",
+    }
+
+    assert event["decision"] == "ALLOW_WITH_MONITORING"
+    assert event["action"] == "executed_with_monitoring"
+    assert event["request"] == {
+        "resource": "sensitive.csv",
+        "metadata": {
+            "scope": ["read", "export"],
+        },
+    }
+
+def test_runtime_security_event_snapshot_mutation_isolated():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {
+                "scope": ["read"],
+            },
+        },
+    )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "second",
+        request={
+            "resource": "second.csv",
+            "metadata": {
+                "scope": ["write"],
+            },
+        },
+    )
+
+    events = service.gateway.security_events
+
+    events[0]["request"]["metadata"]["scope"].append("export")
+    events[0]["action"] = "modified_action"
+
+    assert events[0]["action"] == "modified_action"
+    assert events[0]["request"] == {
+        "resource": "first.csv",
+        "metadata": {
+            "scope": ["read", "export"],
+        },
+    }
+
+    assert events[1]["action"] == "executed_with_monitoring"
+    assert events[1]["request"] == {
+        "resource": "second.csv",
+        "metadata": {
+            "scope": ["write"],
+        },
+    }
+
+def test_runtime_security_event_snapshots_share_consistent_schema():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third",
+        request={"resource": "third.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 3
+
+    expected_fields = {"decision", "request", "action"}
+
+    for event in events:
+        assert set(event.keys()) == expected_fields
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+
+    assert events[1]["decision"] == "BLOCK"
+    assert events[1]["action"] == "execution_blocked"
+
+    assert events[2]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[2]["action"] == "executed_with_monitoring"
+
+def test_runtime_security_event_snapshots_preserve_corresponding_values():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third",
+        request={"resource": "third.csv"},
+    )
+
+    events = service.gateway.security_events
+
+    assert events[0] == {
+        "decision": "ALLOW_WITH_MONITORING",
+        "request": {"resource": "first.csv"},
+        "action": "executed_with_monitoring",
+    }
+
+    assert events[1] == {
+        "decision": "BLOCK",
+        "request": {"resource": "blocked.csv"},
+        "action": "execution_blocked",
+    }
+
+    assert events[2] == {
+        "decision": "ALLOW_WITH_MONITORING",
+        "request": {"resource": "third.csv"},
+        "action": "executed_with_monitoring",
+    }
+
+def test_runtime_security_event_snapshots_preserve_order_and_values():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {"sequence": 1},
+        },
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={
+                "resource": "blocked.csv",
+                "metadata": {"sequence": 2},
+            },
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third",
+        request={
+            "resource": "third.csv",
+            "metadata": {"sequence": 3},
+        },
+    )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 3
+
+    assert events[0] == {
+        "decision": "ALLOW_WITH_MONITORING",
+        "request": {
+            "resource": "first.csv",
+            "metadata": {"sequence": 1},
+        },
+        "action": "executed_with_monitoring",
+    }
+
+    assert events[1] == {
+        "decision": "BLOCK",
+        "request": {
+            "resource": "blocked.csv",
+            "metadata": {"sequence": 2},
+        },
+        "action": "execution_blocked",
+    }
+
+    assert events[2] == {
+        "decision": "ALLOW_WITH_MONITORING",
+        "request": {
+            "resource": "third.csv",
+            "metadata": {"sequence": 3},
+        },
+        "action": "executed_with_monitoring",
+    }
+
+    assert [
+        event["request"]["metadata"]["sequence"]
+        for event in events
+    ] == [1, 2, 3]

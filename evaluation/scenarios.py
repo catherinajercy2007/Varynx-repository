@@ -1,162 +1,162 @@
 """
-Day 48 - Experimental Scenario Matrix
+Day 48 - Evaluation Scenarios
 
-Defines controlled security scenarios for Member 3's
-research evaluation.
-
-This module does not implement security detection.
-It only provides reproducible experimental scenarios.
+Defines deterministic scenarios used to evaluate the Aegis agent
+security and authorization behavior.
 """
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import List
 
 
 @dataclass(frozen=True)
 class EvaluationScenario:
-    """One controlled experimental scenario."""
+    """Represents one evaluation scenario."""
 
     scenario_id: str
     name: str
-    category: str
     description: str
-    expected_risk: str
-    expected_label: int
+    agent_id: str
+    action: str
+    resource: str
+    expected_decision: str
+    expected_risk_level: str
 
 
-SCENARIO_CATEGORIES = (
-    "normal",
-    "suspicious",
-    "malicious",
-)
+SCENARIOS: List[EvaluationScenario] = [
+    EvaluationScenario(
+        scenario_id="S01",
+        name="Normal authorized request",
+        description="A trusted agent performs an authorized read operation.",
+        agent_id="agent_001",
+        action="read",
+        resource="public_data",
+        expected_decision="ALLOW",
+        expected_risk_level="LOW",
+    ),
+    EvaluationScenario(
+        scenario_id="S02",
+        name="Unauthorized resource access",
+        description="An agent attempts to access a restricted resource.",
+        agent_id="agent_001",
+        action="read",
+        resource="restricted_data",
+        expected_decision="DENY",
+        expected_risk_level="HIGH",
+    ),
+    EvaluationScenario(
+        scenario_id="S03",
+        name="Invalid agent request",
+        description="An unknown agent attempts to perform an operation.",
+        agent_id="unknown_agent",
+        action="read",
+        resource="public_data",
+        expected_decision="DENY",
+        expected_risk_level="HIGH",
+    ),
+    EvaluationScenario(
+        scenario_id="S04",
+        name="Unauthorized action",
+        description="A trusted agent attempts an action outside its permissions.",
+        agent_id="agent_001",
+        action="delete",
+        resource="public_data",
+        expected_decision="DENY",
+        expected_risk_level="HIGH",
+    ),
+    EvaluationScenario(
+        scenario_id="S05",
+        name="Privilege escalation attempt",
+        description="An agent attempts to perform a privileged operation.",
+        agent_id="agent_002",
+        action="grant_admin",
+        resource="system",
+        expected_decision="DENY",
+        expected_risk_level="CRITICAL",
+    ),
+    EvaluationScenario(
+        scenario_id="S06",
+        name="Repeated suspicious requests",
+        description="Repeated requests indicate potentially abusive behavior.",
+        agent_id="agent_002",
+        action="read",
+        resource="restricted_data",
+        expected_decision="DENY",
+        expected_risk_level="HIGH",
+    ),
+    EvaluationScenario(
+        scenario_id="S07",
+        name="Destructive operation",
+        description="An agent attempts a destructive system operation.",
+        agent_id="agent_002",
+        action="delete_system",
+        resource="system",
+        expected_decision="DENY",
+        expected_risk_level="CRITICAL",
+    ),
+    EvaluationScenario(
+        scenario_id="S08",
+        name="Normal write request",
+        description="A trusted agent performs an authorized write operation.",
+        agent_id="agent_001",
+        action="write",
+        resource="agent_data",
+        expected_decision="ALLOW",
+        expected_risk_level="LOW",
+    ),
+]
 
 
-def get_scenarios() -> Tuple[EvaluationScenario, ...]:
-    """Return the controlled Day 48 scenario matrix."""
-
-    return (
-        EvaluationScenario(
-            scenario_id="S01",
-            name="Normal Agent Activity",
-            category="normal",
-            description=(
-                "Agent performs an expected action within "
-                "its normal behavioral context."
-            ),
-            expected_risk="low",
-            expected_label=0,
-        ),
-        EvaluationScenario(
-            scenario_id="S02",
-            name="Normal Resource Access",
-            category="normal",
-            description=(
-                "Agent accesses a resource that is routinely "
-                "used within its established behavior."
-            ),
-            expected_risk="low",
-            expected_label=0,
-        ),
-        EvaluationScenario(
-            scenario_id="S03",
-            name="Unusual Resource Access",
-            category="suspicious",
-            description=(
-                "Agent accesses a resource outside its usual "
-                "behavioral pattern."
-            ),
-            expected_risk="medium",
-            expected_label=1,
-        ),
-        EvaluationScenario(
-            scenario_id="S04",
-            name="Repeated Denial Pattern",
-            category="suspicious",
-            description=(
-                "Agent repeatedly requests actions that have "
-                "previously been denied."
-            ),
-            expected_risk="medium",
-            expected_label=1,
-        ),
-        EvaluationScenario(
-            scenario_id="S05",
-            name="Behavioral Drift",
-            category="suspicious",
-            description=(
-                "Agent behavior gradually deviates from its "
-                "established behavioral profile."
-            ),
-            expected_risk="medium",
-            expected_label=1,
-        ),
-        EvaluationScenario(
-            scenario_id="S06",
-            name="Privilege Escalation Attempt",
-            category="malicious",
-            description=(
-                "Agent attempts to perform an action requiring "
-                "privileges beyond its authorized scope."
-            ),
-            expected_risk="high",
-            expected_label=1,
-        ),
-        EvaluationScenario(
-            scenario_id="S07",
-            name="Tool Abuse Attempt",
-            category="malicious",
-            description=(
-                "Agent attempts to use an available tool in a "
-                "way inconsistent with its authorized purpose."
-            ),
-            expected_risk="high",
-            expected_label=1,
-        ),
-        EvaluationScenario(
-            scenario_id="S08",
-            name="Cross-Context Attack Chain",
-            category="malicious",
-            description=(
-                "A sequence of individually unusual actions "
-                "forms a suspicious cross-context behavior chain."
-            ),
-            expected_risk="high",
-            expected_label=1,
-        ),
-    )
+def get_scenarios() -> List[EvaluationScenario]:
+    """Return all evaluation scenarios."""
+    return list(SCENARIOS)
 
 
 def get_scenario(scenario_id: str) -> EvaluationScenario:
-    """Return one scenario by identifier."""
+    """Return a scenario by ID.
 
-    for scenario in get_scenarios():
+    Raises:
+        ValueError: If the scenario ID does not exist.
+    """
+    for scenario in SCENARIOS:
         if scenario.scenario_id == scenario_id:
             return scenario
 
-    valid_ids = [
-        scenario.scenario_id
-        for scenario in get_scenarios()
+    raise ValueError(f"Unknown scenario: {scenario_id}")
+
+
+def get_scenarios_by_decision(decision: str) -> List[EvaluationScenario]:
+    """Return scenarios grouped by expected decision."""
+    decision = decision.upper()
+
+    return [
+        scenario
+        for scenario in SCENARIOS
+        if scenario.expected_decision.upper() == decision
     ]
 
-    raise ValueError(
-        f"Unknown scenario '{scenario_id}'. "
-        f"Expected one of: {valid_ids}"
-    )
 
+def get_scenarios_by_risk(risk_level: str) -> List[EvaluationScenario]:
+    """Return scenarios grouped by expected risk level."""
+    risk_level = risk_level.upper()
 
-def get_scenarios_by_category(
-    category: str,
-) -> Tuple[EvaluationScenario, ...]:
-    """Return scenarios belonging to one category."""
-
-    if category not in SCENARIO_CATEGORIES:
-        raise ValueError(
-            f"Unknown category '{category}'. "
-            f"Expected one of: {SCENARIO_CATEGORIES}"
-        )
-
-    return tuple(
+    return [
         scenario
-        for scenario in get_scenarios()
-        if scenario.category == category
-    )
+        for scenario in SCENARIOS
+        if scenario.expected_risk_level.upper() == risk_level
+    ]
+
+
+def scenario_summary() -> dict:
+    """Return a summary of the evaluation scenario set."""
+
+    scenarios = get_scenarios()
+
+    return {
+        "total_scenarios": len(scenarios),
+        "allow_cases": len(get_scenarios_by_decision("ALLOW")),
+        "deny_cases": len(get_scenarios_by_decision("DENY")),
+        "low_risk_cases": len(get_scenarios_by_risk("LOW")),
+        "high_risk_cases": len(get_scenarios_by_risk("HIGH")),
+        "critical_risk_cases": len(get_scenarios_by_risk("CRITICAL")),
+    }

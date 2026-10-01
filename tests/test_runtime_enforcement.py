@@ -922,3 +922,34 @@ def test_runtime_security_event_entries_preserve_independent_nested_requests():
             "scope": ["write"],
         },
     }
+
+def test_runtime_security_event_snapshot_preserves_security_fields():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "sensitive.csv",
+            "metadata": {
+                "scope": ["read", "export"],
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+
+    assert set(event.keys()) == {
+        "decision",
+        "request",
+        "action",
+    }
+
+    assert event["decision"] == "ALLOW_WITH_MONITORING"
+    assert event["action"] == "executed_with_monitoring"
+    assert event["request"] == {
+        "resource": "sensitive.csv",
+        "metadata": {
+            "scope": ["read", "export"],
+        },
+    }

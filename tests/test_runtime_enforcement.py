@@ -1081,3 +1081,70 @@ def test_runtime_security_event_snapshots_preserve_corresponding_values():
         "request": {"resource": "third.csv"},
         "action": "executed_with_monitoring",
     }
+
+def test_runtime_security_event_snapshots_preserve_order_and_values():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={
+            "resource": "first.csv",
+            "metadata": {"sequence": 1},
+        },
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={
+                "resource": "blocked.csv",
+                "metadata": {"sequence": 2},
+            },
+        )
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "third",
+        request={
+            "resource": "third.csv",
+            "metadata": {"sequence": 3},
+        },
+    )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 3
+
+    assert events[0] == {
+        "decision": "ALLOW_WITH_MONITORING",
+        "request": {
+            "resource": "first.csv",
+            "metadata": {"sequence": 1},
+        },
+        "action": "executed_with_monitoring",
+    }
+
+    assert events[1] == {
+        "decision": "BLOCK",
+        "request": {
+            "resource": "blocked.csv",
+            "metadata": {"sequence": 2},
+        },
+        "action": "execution_blocked",
+    }
+
+    assert events[2] == {
+        "decision": "ALLOW_WITH_MONITORING",
+        "request": {
+            "resource": "third.csv",
+            "metadata": {"sequence": 3},
+        },
+        "action": "executed_with_monitoring",
+    }
+
+    assert [
+        event["request"]["metadata"]["sequence"]
+        for event in events
+    ] == [1, 2, 3]

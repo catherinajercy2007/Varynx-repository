@@ -1148,3 +1148,47 @@ def test_runtime_security_event_snapshots_preserve_order_and_values():
         event["request"]["metadata"]["sequence"]
         for event in events
     ] == [1, 2, 3]
+
+def test_runtime_security_event_snapshots_are_complete():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 2
+
+    for event in events:
+        assert "decision" in event
+        assert "request" in event
+        assert "action" in event
+
+        assert event["decision"] in {
+            "ALLOW_WITH_MONITORING",
+            "BLOCK",
+        }
+
+        assert event["action"] in {
+            "executed_with_monitoring",
+            "execution_blocked",
+        }
+
+        assert isinstance(event["request"], dict)
+        assert event["request"]
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+
+    assert events[1]["decision"] == "BLOCK"
+    assert events[1]["action"] == "execution_blocked"

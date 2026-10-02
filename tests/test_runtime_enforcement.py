@@ -1292,3 +1292,27 @@ def test_runtime_security_event_snapshot_boolean_values_preserve_type():
 
     assert metadata["enabled"] is True
     assert metadata["verified"] is False
+
+def test_runtime_security_event_snapshot_integer_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "integer.csv",
+            "metadata": {
+                "priority": 5,
+                "retry_count": 3,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert isinstance(metadata["priority"], int)
+    assert isinstance(metadata["retry_count"], int)
+
+    assert metadata["priority"] == 5
+    assert metadata["retry_count"] == 3

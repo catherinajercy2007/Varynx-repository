@@ -1268,3 +1268,27 @@ def test_runtime_security_event_snapshot_nested_values_preserve_expected_types()
     assert request["metadata"]["scope"] == ["read", "export"]
     assert request["metadata"]["enabled"] is True
     assert request["metadata"]["priority"] == 5
+
+def test_runtime_security_event_snapshot_boolean_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "boolean.csv",
+            "metadata": {
+                "enabled": True,
+                "verified": False,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert isinstance(metadata["enabled"], bool)
+    assert isinstance(metadata["verified"], bool)
+
+    assert metadata["enabled"] is True
+    assert metadata["verified"] is False

@@ -1233,3 +1233,38 @@ def test_runtime_security_event_snapshots_preserve_expected_types():
         isinstance(scope, str)
         for scope in event["request"]["metadata"]["scope"]
     )
+
+def test_runtime_security_event_snapshot_nested_values_preserve_expected_types():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "nested.csv",
+            "metadata": {
+                "scope": ["read", "export"],
+                "enabled": True,
+                "priority": 5,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    request = event["request"]
+
+    assert isinstance(request["resource"], str)
+    assert isinstance(request["metadata"], dict)
+
+    assert isinstance(request["metadata"]["scope"], list)
+    assert all(
+        isinstance(scope, str)
+        for scope in request["metadata"]["scope"]
+    )
+
+    assert isinstance(request["metadata"]["enabled"], bool)
+    assert isinstance(request["metadata"]["priority"], int)
+
+    assert request["metadata"]["scope"] == ["read", "export"]
+    assert request["metadata"]["enabled"] is True
+    assert request["metadata"]["priority"] == 5

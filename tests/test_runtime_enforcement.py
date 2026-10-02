@@ -1316,3 +1316,27 @@ def test_runtime_security_event_snapshot_integer_values_preserve_type():
 
     assert metadata["priority"] == 5
     assert metadata["retry_count"] == 3
+
+def test_runtime_security_event_snapshot_float_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "float.csv",
+            "metadata": {
+                "threshold": 0.75,
+                "confidence": 0.95,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert isinstance(metadata["threshold"], float)
+    assert isinstance(metadata["confidence"], float)
+
+    assert metadata["threshold"] == 0.75
+    assert metadata["confidence"] == 0.95

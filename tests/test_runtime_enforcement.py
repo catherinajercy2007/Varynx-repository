@@ -1192,3 +1192,44 @@ def test_runtime_security_event_snapshots_are_complete():
 
     assert events[1]["decision"] == "BLOCK"
     assert events[1]["action"] == "execution_blocked"
+
+def test_runtime_security_event_snapshots_preserve_expected_types():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "typed.csv",
+            "metadata": {
+                "scope": ["read"],
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+
+    assert isinstance(event, dict)
+    assert isinstance(event["decision"], str)
+    assert isinstance(event["action"], str)
+    assert isinstance(event["request"], dict)
+
+    assert isinstance(
+        event["request"]["resource"],
+        str,
+    )
+
+    assert isinstance(
+        event["request"]["metadata"],
+        dict,
+    )
+
+    assert isinstance(
+        event["request"]["metadata"]["scope"],
+        list,
+    )
+
+    assert all(
+        isinstance(scope, str)
+        for scope in event["request"]["metadata"]["scope"]
+    )

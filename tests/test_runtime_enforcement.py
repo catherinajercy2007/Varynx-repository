@@ -1388,3 +1388,48 @@ def test_runtime_security_event_snapshot_string_values_preserve_type():
 
     assert metadata["owner"] == "security-team"
     assert metadata["classification"] == "confidential"
+
+def test_runtime_security_event_snapshot_mixed_nested_values_preserve_integrity():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "mixed.csv",
+            "metadata": {
+                "owner": "security-team",
+                "enabled": True,
+                "priority": 5,
+                "threshold": 0.75,
+                "description": None,
+                "scope": ["read", "export"],
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    request = event["request"]
+    metadata = request["metadata"]
+
+    assert request["resource"] == "mixed.csv"
+    assert isinstance(request["resource"], str)
+
+    assert metadata["owner"] == "security-team"
+    assert isinstance(metadata["owner"], str)
+
+    assert metadata["enabled"] is True
+    assert isinstance(metadata["enabled"], bool)
+
+    assert metadata["priority"] == 5
+    assert isinstance(metadata["priority"], int)
+
+    assert metadata["threshold"] == 0.75
+    assert isinstance(metadata["threshold"], float)
+
+    assert metadata["description"] is None
+    assert type(metadata["description"]) is type(None)
+
+    assert metadata["scope"] == ["read", "export"]
+    assert isinstance(metadata["scope"], list)
+    assert all(isinstance(scope, str) for scope in metadata["scope"])

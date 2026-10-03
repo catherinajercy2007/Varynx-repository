@@ -1364,3 +1364,27 @@ def test_runtime_security_event_snapshot_none_values_preserve_type():
 
     assert type(metadata["description"]) is type(None)
     assert type(metadata["owner"]) is type(None)
+
+def test_runtime_security_event_snapshot_string_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "string.csv",
+            "metadata": {
+                "owner": "security-team",
+                "classification": "confidential",
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert isinstance(metadata["owner"], str)
+    assert isinstance(metadata["classification"], str)
+
+    assert metadata["owner"] == "security-team"
+    assert metadata["classification"] == "confidential"

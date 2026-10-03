@@ -1148,3 +1148,346 @@ def test_runtime_security_event_snapshots_preserve_order_and_values():
         event["request"]["metadata"]["sequence"]
         for event in events
     ] == [1, 2, 3]
+
+def test_runtime_security_event_snapshots_are_complete():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "first",
+        request={"resource": "first.csv"},
+    )
+
+    with pytest.raises(RuntimeEnforcementError):
+        service.execute(
+            decision="DENY",
+            tool=lambda request: "blocked",
+            request={"resource": "blocked.csv"},
+        )
+
+    events = service.gateway.security_events
+
+    assert len(events) == 2
+
+    for event in events:
+        assert "decision" in event
+        assert "request" in event
+        assert "action" in event
+
+        assert event["decision"] in {
+            "ALLOW_WITH_MONITORING",
+            "BLOCK",
+        }
+
+        assert event["action"] in {
+            "executed_with_monitoring",
+            "execution_blocked",
+        }
+
+        assert isinstance(event["request"], dict)
+        assert event["request"]
+
+    assert events[0]["decision"] == "ALLOW_WITH_MONITORING"
+    assert events[0]["action"] == "executed_with_monitoring"
+
+    assert events[1]["decision"] == "BLOCK"
+    assert events[1]["action"] == "execution_blocked"
+
+def test_runtime_security_event_snapshots_preserve_expected_types():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "typed.csv",
+            "metadata": {
+                "scope": ["read"],
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+
+    assert isinstance(event, dict)
+    assert isinstance(event["decision"], str)
+    assert isinstance(event["action"], str)
+    assert isinstance(event["request"], dict)
+
+    assert isinstance(
+        event["request"]["resource"],
+        str,
+    )
+
+    assert isinstance(
+        event["request"]["metadata"],
+        dict,
+    )
+
+    assert isinstance(
+        event["request"]["metadata"]["scope"],
+        list,
+    )
+
+    assert all(
+        isinstance(scope, str)
+        for scope in event["request"]["metadata"]["scope"]
+    )
+
+def test_runtime_security_event_snapshot_nested_values_preserve_expected_types():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "nested.csv",
+            "metadata": {
+                "scope": ["read", "export"],
+                "enabled": True,
+                "priority": 5,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    request = event["request"]
+
+    assert isinstance(request["resource"], str)
+    assert isinstance(request["metadata"], dict)
+
+    assert isinstance(request["metadata"]["scope"], list)
+    assert all(
+        isinstance(scope, str)
+        for scope in request["metadata"]["scope"]
+    )
+
+    assert isinstance(request["metadata"]["enabled"], bool)
+    assert isinstance(request["metadata"]["priority"], int)
+
+    assert request["metadata"]["scope"] == ["read", "export"]
+    assert request["metadata"]["enabled"] is True
+    assert request["metadata"]["priority"] == 5
+
+def test_runtime_security_event_snapshot_boolean_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "boolean.csv",
+            "metadata": {
+                "enabled": True,
+                "verified": False,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert isinstance(metadata["enabled"], bool)
+    assert isinstance(metadata["verified"], bool)
+
+    assert metadata["enabled"] is True
+    assert metadata["verified"] is False
+
+def test_runtime_security_event_snapshot_integer_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "integer.csv",
+            "metadata": {
+                "priority": 5,
+                "retry_count": 3,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert isinstance(metadata["priority"], int)
+    assert isinstance(metadata["retry_count"], int)
+
+    assert metadata["priority"] == 5
+    assert metadata["retry_count"] == 3
+
+def test_runtime_security_event_snapshot_float_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "float.csv",
+            "metadata": {
+                "threshold": 0.75,
+                "confidence": 0.95,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert isinstance(metadata["threshold"], float)
+    assert isinstance(metadata["confidence"], float)
+
+    assert metadata["threshold"] == 0.75
+    assert metadata["confidence"] == 0.95
+
+def test_runtime_security_event_snapshot_none_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "optional.csv",
+            "metadata": {
+                "description": None,
+                "owner": None,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert metadata["description"] is None
+    assert metadata["owner"] is None
+
+    assert type(metadata["description"]) is type(None)
+    assert type(metadata["owner"]) is type(None)
+
+def test_runtime_security_event_snapshot_string_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "string.csv",
+            "metadata": {
+                "owner": "security-team",
+                "classification": "confidential",
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert isinstance(metadata["owner"], str)
+    assert isinstance(metadata["classification"], str)
+
+    assert metadata["owner"] == "security-team"
+    assert metadata["classification"] == "confidential"
+
+def test_runtime_security_event_snapshot_mixed_nested_values_preserve_integrity():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "mixed.csv",
+            "metadata": {
+                "owner": "security-team",
+                "enabled": True,
+                "priority": 5,
+                "threshold": 0.75,
+                "description": None,
+                "scope": ["read", "export"],
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    request = event["request"]
+    metadata = request["metadata"]
+
+    assert request["resource"] == "mixed.csv"
+    assert isinstance(request["resource"], str)
+
+    assert metadata["owner"] == "security-team"
+    assert isinstance(metadata["owner"], str)
+
+    assert metadata["enabled"] is True
+    assert isinstance(metadata["enabled"], bool)
+
+    assert metadata["priority"] == 5
+    assert isinstance(metadata["priority"], int)
+
+    assert metadata["threshold"] == 0.75
+    assert isinstance(metadata["threshold"], float)
+
+    assert metadata["description"] is None
+    assert type(metadata["description"]) is type(None)
+
+    assert metadata["scope"] == ["read", "export"]
+    assert isinstance(metadata["scope"], list)
+    assert all(isinstance(scope, str) for scope in metadata["scope"])
+
+def test_runtime_security_event_snapshot_complete_structure_integrity():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "complete.csv",
+            "metadata": {
+                "owner": "security-team",
+                "enabled": True,
+                "priority": 5,
+                "threshold": 0.75,
+                "description": None,
+                "scope": ["read", "export"],
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+
+    assert set(event.keys()) == {
+        "decision",
+        "request",
+        "action",
+    }
+
+    assert event["decision"] == "ALLOW_WITH_MONITORING"
+    assert event["action"] == "executed_with_monitoring"
+
+    request = event["request"]
+    metadata = request["metadata"]
+
+    assert request["resource"] == "complete.csv"
+    assert isinstance(request["resource"], str)
+
+    assert metadata["owner"] == "security-team"
+    assert isinstance(metadata["owner"], str)
+
+    assert metadata["enabled"] is True
+    assert isinstance(metadata["enabled"], bool)
+
+    assert metadata["priority"] == 5
+    assert isinstance(metadata["priority"], int)
+
+    assert metadata["threshold"] == 0.75
+    assert isinstance(metadata["threshold"], float)
+
+    assert metadata["description"] is None
+    assert type(metadata["description"]) is type(None)
+
+    assert metadata["scope"] == ["read", "export"]
+    assert isinstance(metadata["scope"], list)
+    assert all(
+        isinstance(scope, str)
+        for scope in metadata["scope"]
+    )

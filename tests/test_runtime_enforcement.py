@@ -1340,3 +1340,27 @@ def test_runtime_security_event_snapshot_float_values_preserve_type():
 
     assert metadata["threshold"] == 0.75
     assert metadata["confidence"] == 0.95
+
+def test_runtime_security_event_snapshot_none_values_preserve_type():
+    service = RuntimeExecutionService()
+
+    service.execute(
+        decision="ALLOW_WITH_MONITORING",
+        tool=lambda request: "executed",
+        request={
+            "resource": "optional.csv",
+            "metadata": {
+                "description": None,
+                "owner": None,
+            },
+        },
+    )
+
+    event = service.gateway.security_events[0]
+    metadata = event["request"]["metadata"]
+
+    assert metadata["description"] is None
+    assert metadata["owner"] is None
+
+    assert type(metadata["description"]) is type(None)
+    assert type(metadata["owner"]) is type(None)

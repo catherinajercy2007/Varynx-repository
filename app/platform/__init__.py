@@ -42,6 +42,11 @@ from .runtime_decision_audit import (
     RuntimeDecisionAudit,
     RuntimeDecisionAuditRecord,
 )
+
+from .capability_lease import (
+    CapabilityLease,
+    CapabilityLeasePlatformAdapter,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -64,4 +69,6 @@ __all__ = [
     "SecurityDecisionBridgePlatformAdapter",
     "SecurityDecisionReconciliationPlatformAdapter",
     "SecurityDecisionRuntimeHandoffPlatformAdapter",
+    "CapabilityLease",
+    "CapabilityLeasePlatformAdapter",
 ]

@@ -47,6 +47,7 @@ from .capability_lease import (
     CapabilityLease,
     CapabilityLeasePlatformAdapter,
 )
+from .capability_scope_integration import CapabilityScopeIntegration
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -71,4 +72,5 @@ __all__ = [
     "SecurityDecisionRuntimeHandoffPlatformAdapter",
     "CapabilityLease",
     "CapabilityLeasePlatformAdapter",
+    "CapabilityScopeIntegration",
 ]

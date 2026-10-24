@@ -17,6 +17,10 @@ from uuid import uuid4
 
 from app.platform.health import health_check, readiness_check
 from app.platform.metrics import get_metrics
+from app.platform.capability_lease import CapabilityLeasePlatformAdapter
+from app.platform.counterfactual_capability_gate_service import (
+    evaluate_counterfactual_capability,
+)
 
 
 _CORRELATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -80,6 +84,7 @@ def gateway_info() -> dict[str, Any]:
             "readiness": "/ready",
             "metrics": "/metrics",
             "reason_codes": "/reason-codes",
+            "counterfactual_capability": "/counterfactual-capability",
         },
     }
 
@@ -174,7 +179,9 @@ def gateway_reason_codes(
     return result
 
 
-def create_app():
+def create_app(
+    lease_adapter: CapabilityLeasePlatformAdapter | None = None,
+):
     """Create the FastAPI application."""
     try:
         from fastapi import FastAPI, Header, HTTPException, Request
@@ -256,6 +263,33 @@ def create_app():
                 headers={
                     "X-Correlation-ID": result["correlation_id"],
                 },
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=str(exc),
+            ) from exc
+
+
+    @application.post("/counterfactual-capability")
+    def counterfactual_capability(
+        payload: dict[str, Any],
+        x_correlation_id: str | None = Header(default=None),
+    ):
+        """Evaluate a hypothetical capability decision without execution."""
+        try:
+            result = evaluate_counterfactual_capability(
+                payload,
+                lease_adapter=lease_adapter,
+            )
+            correlation_id = (
+                x_correlation_id
+                or str(uuid4())
+            )
+            result["correlation_id"] = correlation_id
+            return JSONResponse(
+                content=result,
+                headers={"X-Correlation-ID": correlation_id},
             )
         except ValueError as exc:
             raise HTTPException(

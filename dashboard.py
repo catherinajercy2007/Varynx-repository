@@ -761,6 +761,7 @@ NAVIGATION = [
     "🧾 Day 79 Security Decision Reason Codes",
 
     "⏱️ Day 82 Rate-Limit Monitoring",
+    "Day 84 Audit Evidence",
 
     "📚 Research Interpretation",
 
@@ -1230,6 +1231,134 @@ elif dashboard_view == "🧠 Behavioral Analytics":
 # DAY 79 — SECURITY DECISION REASON CODES
 # ============================================================
 
+elif dashboard_view == "Day 84 Audit Evidence":
+
+    st.header("Day 84 ? Audit Evidence Storage & Retrieval")
+    st.caption(
+        "Browse structured audit evidence stored in SQLite. "
+        "This view is read-only; it does not create decisions or enforce policy."
+    )
+
+    from app.audit_evidence_store import AuditEvidenceStore
+
+    try:
+        audit_store = AuditEvidenceStore()
+
+        filter_col1, filter_col2, filter_col3 = st.columns(3)
+        with filter_col1:
+            agent_filter = st.text_input(
+                "Filter by agent ID",
+                key="day84_agent_filter",
+                placeholder="Any agent",
+            ).strip()
+        with filter_col2:
+            decision_filter = st.text_input(
+                "Filter by decision",
+                key="day84_decision_filter",
+                placeholder="Any decision",
+            ).strip()
+        with filter_col3:
+            page_size = st.selectbox(
+                "Records per page",
+                options=[10, 25, 50, 100],
+                index=1,
+                key="day84_page_size",
+            )
+
+        offset = st.number_input(
+            "Starting record offset",
+            min_value=0,
+            step=int(page_size),
+            value=0,
+            key="day84_offset",
+        )
+
+        result = audit_store.list_records(
+            agent_id=agent_filter or None,
+            decision=decision_filter or None,
+            limit=int(page_size),
+            offset=int(offset),
+        )
+        records = result["records"]
+
+        total_col, page_col, storage_col = st.columns(3)
+        total_col.metric("Matching evidence records", result["total"])
+        page_col.metric("Records on this page", len(records))
+        storage_col.metric("Storage", "SQLite")
+
+        if not records:
+            st.info(
+                "No stored audit evidence matches these filters. "
+                "Legacy audit events are not automatically converted "
+                "into structured evidence records."
+            )
+        else:
+            summary_df = pd.DataFrame(
+                [
+                    {
+                        "Timestamp": item["timestamp"],
+                        "Audit ID": item["audit_id"],
+                        "Agent": item["agent_id"],
+                        "Decision": item["decision"],
+                        "Risk": item["risk_score"],
+                        "Anomaly": item["anomaly_score"],
+                        "Source": item["source"] or "",
+                    }
+                    for item in records
+                ]
+            )
+
+            st.subheader("Evidence records")
+            st.dataframe(
+                summary_df,
+                width="stretch",
+                hide_index=True,
+            )
+
+            st.subheader("Risk scores on this page")
+            risk_df = summary_df[
+                ["Audit ID", "Risk", "Anomaly"]
+            ].set_index("Audit ID")
+            st.bar_chart(risk_df)
+
+            selected_audit_id = st.selectbox(
+                "Inspect an audit record",
+                options=[item["audit_id"] for item in records],
+                key="day84_selected_audit_id",
+            )
+
+            selected_record = audit_store.get(selected_audit_id)
+            if selected_record is not None:
+                st.subheader("Record details")
+                st.json(selected_record.to_dict())
+
+                if st.button(
+                    "Verify stored fingerprint",
+                    key="day84_verify_fingerprint",
+                ):
+                    verification = audit_store.verify(selected_audit_id)
+                    if verification is None:
+                        st.warning("The selected record was not found.")
+                    elif verification["valid"]:
+                        st.success(
+                            "Fingerprint matches the stored record contents."
+                        )
+                    else:
+                        st.error(
+                            "Fingerprint mismatch. Stored contents and "
+                            "fingerprint do not agree."
+                        )
+                    if verification is not None:
+                        st.json(verification)
+
+        st.caption(
+            "Fingerprint verification checks stored content consistency; "
+            "it is not a digital signature or proof of authorship."
+        )
+
+    except Exception as exc:
+        st.error("Could not load audit evidence from SQLite.")
+        record_dashboard_error("day84_audit_evidence", exc)
 elif dashboard_view == "\u23f1\ufe0f Day 82 Rate-Limit Monitoring":
 
     st.header("\u23f1\ufe0f Day 82 \u2014 Rate-Limit Configuration & Monitoring")

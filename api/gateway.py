@@ -12,9 +12,39 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+import re
+from uuid import uuid4
 
 from app.platform.health import health_check, readiness_check
 from app.platform.metrics import get_metrics
+
+
+_CORRELATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
+def _normalize_correlation_id(
+    value: Any,
+    field_name: str,
+) -> str | None:
+    """Validate a supplied correlation identifier."""
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be a string")
+
+    normalized = value.strip()
+    if not normalized:
+        return None
+
+    if not _CORRELATION_ID_PATTERN.fullmatch(normalized):
+        raise ValueError(
+            f"{field_name} must contain 1-128 characters from "
+            "letters, numbers, dot, underscore, colon, or hyphen"
+        )
+
+    return normalized
+
 from app.platform.rate_limit import (
     get_rate_limit_config,
     get_rate_limit_monitor,
@@ -103,9 +133,19 @@ def gateway_reason_codes(
     ]
 
     correlation_id = (
-        correlation_id_header
-        or payload.get("correlation_id")
-        or payload.get("event_id")
+        _normalize_correlation_id(
+            correlation_id_header,
+            "X-Correlation-ID",
+        )
+        or _normalize_correlation_id(
+            payload.get("correlation_id"),
+            "correlation_id",
+        )
+        or _normalize_correlation_id(
+            payload.get("event_id"),
+            "event_id",
+        )
+        or str(uuid4())
     )
 
     result: dict[str, Any] = {
@@ -137,7 +177,7 @@ def gateway_reason_codes(
 def create_app():
     """Create the FastAPI application."""
     try:
-        from fastapi import FastAPI, Header, HTTPException
+        from fastapi import FastAPI, Header, HTTPException, Request
         from fastapi.responses import JSONResponse
     except ImportError as exc:
         raise RuntimeError(
@@ -153,6 +193,29 @@ def create_app():
             "security architecture."
         ),
     )
+
+    @application.middleware("http")
+    async def correlation_id_middleware(request: Request, call_next):
+        try:
+            supplied_id = _normalize_correlation_id(
+                request.headers.get("X-Correlation-ID"),
+                "X-Correlation-ID",
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                status_code=400,
+                content={"detail": str(exc)},
+            )
+
+        request.state.correlation_id = supplied_id or str(uuid4())
+        response = await call_next(request)
+
+        # A route may select a body correlation ID when no header exists.
+        if not response.headers.get("X-Correlation-ID"):
+            response.headers["X-Correlation-ID"] = (
+                request.state.correlation_id
+            )
+        return response
 
     @application.get("/")
     def info() -> dict[str, Any]:
@@ -182,11 +245,17 @@ def create_app():
     def reason_codes(
         payload: dict[str, Any],
         x_correlation_id: str | None = Header(default=None),
-    ) -> dict[str, Any]:
+    ):
         try:
-            return gateway_reason_codes(
+            result = gateway_reason_codes(
                 payload,
                 correlation_id_header=x_correlation_id,
+            )
+            return JSONResponse(
+                content=result,
+                headers={
+                    "X-Correlation-ID": result["correlation_id"],
+                },
             )
         except ValueError as exc:
             raise HTTPException(

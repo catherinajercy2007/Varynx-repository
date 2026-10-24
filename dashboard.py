@@ -762,6 +762,7 @@ NAVIGATION = [
 
     "⏱️ Day 82 Rate-Limit Monitoring",
     "Day 84 Audit Evidence",
+    "Day 85 Authority State",
 
     "📚 Research Interpretation",
 
@@ -1230,6 +1231,64 @@ elif dashboard_view == "🧠 Behavioral Analytics":
 # ============================================================
 # DAY 79 — SECURITY DECISION REASON CODES
 # ============================================================
+
+elif dashboard_view == "Day 85 Authority State":
+
+    st.header("Day 85 - Authority State Visualization")
+    st.caption(
+        "Visual overview of the capability lease model. "
+        "Live authority records are not available through a shared "
+        "production registry in the current application wiring."
+    )
+
+    st.warning(
+        "Live authority state unavailable: the capability lease adapter "
+        "currently uses an in-memory registry, and no shared production "
+        "instance or lease-management route was found. The values below "
+        "describe supported states, not current platform counts."
+    )
+
+    state_columns = st.columns(3)
+    state_columns[0].metric("Active", "Not reported")
+    state_columns[1].metric("Expired", "Not reported")
+    state_columns[2].metric("Revoked", "Not reported")
+
+    st.subheader("Supported lease states")
+    state_rows = [
+        {
+            "State": "Active",
+            "Meaning": "The lease has not expired and has not been revoked.",
+        },
+        {
+            "State": "Expired",
+            "Meaning": "The current time is at or after the lease expiry.",
+        },
+        {
+            "State": "Revoked",
+            "Meaning": "The lease has an explicit revoked status.",
+        },
+    ]
+    st.dataframe(
+        pd.DataFrame(state_rows),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.subheader("Authority model")
+    st.markdown(
+        "- Lease records include agent, capability, scope, issue time, "
+        "expiry time, and revocation metadata.\n"
+        "- Scope integration requires an existing ALLOW decision and "
+        "a valid matching lease.\n"
+        "- The lease adapter does not independently authorize actions "
+        "or execute tools.\n"
+        "- This dashboard does not issue or revoke leases."
+    )
+
+    st.info(
+        "Next integration step: provide a shared, lifecycle-managed lease "
+        "registry before displaying live counts or individual lease records."
+    )
 
 elif dashboard_view == "Day 84 Audit Evidence":
 

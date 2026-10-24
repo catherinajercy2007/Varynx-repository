@@ -283,7 +283,10 @@ def create_app(
                 lease_adapter=lease_adapter,
             )
             correlation_id = (
-                x_correlation_id
+                _normalize_correlation_id(
+                    x_correlation_id,
+                    "X-Correlation-ID",
+                )
                 or str(uuid4())
             )
             result["correlation_id"] = correlation_id

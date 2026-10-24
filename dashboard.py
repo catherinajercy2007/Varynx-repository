@@ -758,6 +758,8 @@ NAVIGATION = [
 
     "🛡️ Day 30 Adaptive Runtime Response",
 
+    "🧾 Day 79 Security Decision Reason Codes",
+
     "📚 Research Interpretation",
 
     "📅 Project Construction",
@@ -1222,7 +1224,206 @@ elif dashboard_view == "🧠 Behavioral Analytics":
             width="stretch",
             hide_index=True,
         )
+# ============================================================
+# DAY 79 — SECURITY DECISION REASON CODES
+# ============================================================
 
+elif dashboard_view == "🧾 Day 79 Security Decision Reason Codes":
+
+    st.header("🧾 Day 79 — Security Decision Reason Codes")
+
+    st.caption(
+        "Structured explanations of existing security evidence. "
+        "This view does not independently enforce actions or prove intent."
+    )
+
+    default_payload = {
+        "evidence": {
+            "risk_score": 85,
+            "anomaly_score": 70,
+            "repeated_denial_score": 0,
+            "cross_context_score": 0,
+        },
+        "agent_id": "agent-demo",
+        "task_id": "task-demo",
+        "event_id": "event-demo",
+        "correlation_id": "corr-demo-001",
+        "context": {
+            "resource": "example/private/report.txt",
+        },
+        "evidence_refs": [
+            "example-evidence-001",
+        ],
+    }
+
+    raw_payload = st.text_area(
+        "Decision evidence and context (JSON)",
+        value=json.dumps(default_payload, indent=2),
+        height=280,
+        key="day79_reason_code_payload",
+    )
+
+    if st.button(
+        "Generate Explanation",
+        type="primary",
+        key="day79_generate_reason_codes",
+    ):
+        try:
+            payload = json.loads(raw_payload)
+
+            if not isinstance(payload, dict):
+                raise ValueError("Input must be a JSON object.")
+
+            evidence = payload.get("evidence", {})
+
+            if not isinstance(evidence, dict):
+                raise ValueError("'evidence' must be a JSON object.")
+
+            supplied_response = payload.get("response")
+
+            if (
+                supplied_response is not None
+                and not isinstance(supplied_response, dict)
+            ):
+                raise ValueError(
+                    "'response' must be a JSON object when supplied."
+                )
+
+            from app.adaptive_explainability import (
+                explain_adaptive_decision,
+            )
+
+            explanation = explain_adaptive_decision(
+                evidence,
+                supplied_response,
+            )
+
+            triggered_signals = explanation.get(
+                "triggered_signals",
+                [],
+            )
+
+            reason_codes = [
+                item["signal"]
+                for item in triggered_signals
+                if isinstance(item, dict) and item.get("signal")
+            ]
+
+            result = {
+                "decision": explanation.get("decision", {}),
+                "reason_codes": reason_codes,
+                "reason_details": triggered_signals,
+                "evidence": explanation.get("evidence", {}),
+                "reasons": explanation.get("reasons", []),
+                "rationale": explanation.get("rationale", ""),
+                "recommended_controls": explanation.get(
+                    "recommended_controls",
+                    [],
+                ),
+                "agent_id": payload.get("agent_id"),
+                "task_id": payload.get("task_id"),
+                "event_id": payload.get("event_id"),
+                "context": payload.get("context", {}),
+                "evidence_refs": payload.get("evidence_refs", []),
+                "correlation_id": payload.get("correlation_id"),
+                "timestamp": datetime.now().astimezone().isoformat(),
+                "source": "app.adaptive_explainability",
+            }
+
+            st.session_state["day79_reason_code_result"] = result
+
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+            st.error(f"Invalid input: {exc}")
+
+        except Exception as exc:
+            st.error(
+                "Could not produce the explanation from the supplied input."
+            )
+            record_dashboard_error("day79_reason_codes", exc)
+
+    result = st.session_state.get("day79_reason_code_result")
+
+    if result:
+
+        decision = result.get("decision", {})
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric(
+            "Decision",
+            str(decision.get("action", "UNKNOWN")),
+        )
+
+        col2.metric(
+            "Severity",
+            str(decision.get("severity", "UNKNOWN")),
+        )
+
+        col3.metric(
+            "Reason Codes",
+            len(result.get("reason_codes", [])),
+        )
+
+        st.subheader("Reason Codes")
+
+        if result.get("reason_codes"):
+
+            st.dataframe(
+                pd.DataFrame(
+                    {
+                        "Reason Code": result["reason_codes"],
+                    }
+                ),
+                width="stretch",
+                hide_index=True,
+            )
+
+        else:
+            st.info(
+                "No evidence signal crossed the explainability threshold."
+            )
+
+        st.subheader("Decision Rationale")
+
+        st.write(
+            result.get("rationale") or "No rationale supplied."
+        )
+
+        st.subheader("Evidence and Trace Context")
+
+        st.json(
+            {
+                "evidence": result.get("evidence", {}),
+                "reason_details": result.get("reason_details", []),
+                "agent_id": result.get("agent_id"),
+                "task_id": result.get("task_id"),
+                "event_id": result.get("event_id"),
+                "context": result.get("context", {}),
+                "evidence_refs": result.get("evidence_refs", []),
+                "correlation_id": result.get("correlation_id"),
+                "timestamp": result.get("timestamp"),
+            }
+        )
+
+        if result.get("reasons"):
+
+            st.subheader("Decision Reasons")
+
+            for reason in result["reasons"]:
+                st.write(f"- {reason}")
+
+        if result.get("recommended_controls"):
+
+            st.subheader("Recommended Controls")
+
+            for control in result["recommended_controls"]:
+                st.write(f"- {control}")
+
+        st.caption(
+            "Reason codes summarize evidence signals. They are not proof "
+            "of malicious intent and do not independently authorize or "
+            "enforce an action."
+        )
 
 # ============================================================
 # HIGH-RISK EVENTS

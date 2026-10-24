@@ -15,7 +15,10 @@ from typing import Any
 
 from app.platform.health import health_check, readiness_check
 from app.platform.metrics import get_metrics
-
+from app.platform.rate_limit import (
+    get_rate_limit_config,
+    get_rate_limit_monitor,
+)
 
 def gateway_health() -> dict[str, Any]:
     """Return the platform health response."""
@@ -28,8 +31,11 @@ def gateway_readiness() -> dict[str, Any]:
 
 
 def gateway_metrics() -> dict[str, Any]:
-    """Return current platform metrics."""
-    return get_metrics().snapshot()
+    result = get_metrics().snapshot()
+    result["rate_limit"] = get_rate_limit_monitor().snapshot(
+        get_rate_limit_config()
+    )
+    return result
 
 
 def gateway_info() -> dict[str, Any]:

@@ -760,6 +760,8 @@ NAVIGATION = [
 
     "🧾 Day 79 Security Decision Reason Codes",
 
+    "⏱️ Day 82 Rate-Limit Monitoring",
+
     "📚 Research Interpretation",
 
     "📅 Project Construction",
@@ -1227,6 +1229,64 @@ elif dashboard_view == "🧠 Behavioral Analytics":
 # ============================================================
 # DAY 79 — SECURITY DECISION REASON CODES
 # ============================================================
+
+elif dashboard_view == "\u23f1\ufe0f Day 82 Rate-Limit Monitoring":
+
+    st.header("\u23f1\ufe0f Day 82 \u2014 Rate-Limit Configuration & Monitoring")
+    st.caption(
+        "Review configured request limits and monitoring counters. "
+        "This view does not itself enforce request limits."
+    )
+
+    from app.platform.rate_limit import (
+        get_rate_limit_config,
+        get_rate_limit_monitor,
+    )
+
+    rate_limit_config = get_rate_limit_config()
+    rate_limit_snapshot = get_rate_limit_monitor().snapshot(
+        rate_limit_config
+    )
+
+    st.subheader("Configured policy")
+    limit_col, window_col, status_col = st.columns(3)
+
+    limit_col.metric(
+        "Maximum requests",
+        rate_limit_config.max_requests,
+    )
+    window_col.metric(
+        "Window (seconds)",
+        rate_limit_config.window_seconds,
+    )
+    status_col.metric(
+        "Configured enabled",
+        "Yes" if rate_limit_config.enabled else "No",
+    )
+
+    st.subheader("Monitoring snapshot")
+    allowed_col, limited_col, observed_col = st.columns(3)
+
+    allowed_col.metric(
+        "Allowed outcomes recorded",
+        rate_limit_snapshot["requests_allowed"],
+    )
+    limited_col.metric(
+        "Limited outcomes recorded",
+        rate_limit_snapshot["requests_limited"],
+    )
+    observed_col.metric(
+        "Outcomes recorded",
+        rate_limit_snapshot["requests_observed"],
+    )
+
+    st.json(rate_limit_snapshot)
+
+    st.warning(
+        "Rate-limit enforcement is not integrated. These counters change "
+        "only when an enforcement component explicitly records an outcome. "
+        "Enabling configuration alone does not block requests."
+    )
 
 elif dashboard_view == "🧾 Day 79 Security Decision Reason Codes":
 

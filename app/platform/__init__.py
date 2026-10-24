@@ -48,6 +48,12 @@ from .capability_lease import (
     CapabilityLeasePlatformAdapter,
 )
 from .capability_scope_integration import CapabilityScopeIntegration
+from .rate_limit import (
+    RateLimitConfig,
+    RateLimitMonitor,
+    get_rate_limit_config,
+    get_rate_limit_monitor,
+)
 __all__ = [
     "BCSEContextPlatformAdapter",
     "BehavioralPlatformAdapter",
@@ -73,4 +79,8 @@ __all__ = [
     "CapabilityLease",
     "CapabilityLeasePlatformAdapter",
     "CapabilityScopeIntegration",
+        "RateLimitConfig",
+    "RateLimitMonitor",
+    "get_rate_limit_config",
+    "get_rate_limit_monitor",
 ]
